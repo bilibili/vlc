@@ -8,10 +8,46 @@ FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(HASH);sf=tgz
 FFMPEGCONF = \
 	--cc="$(CC)" \
 	--disable-doc \
+	--enable-runtime-cpudetect \
+	--disable-network \
+	--disable-protocols \
+	--disable-decoder=libvpx \
 	--disable-decoder=bink \
-	--disable-encoder=vorbis \
-	--enable-libgsm \
-	--enable-libopenjpeg \
+	--disable-encoders \
+	--disable-libgsm \
+	--disable-libopenjpeg \
+	--disable-decoders \
+	--enable-decoder=aac \
+	--enable-decoder=aac_latm \
+	--enable-decoder=aasc \
+	--enable-decoder=ac3 \
+	--enable-decoder=amrnb \
+	--enable-decoder=amrwb \
+	--enable-decoder=flv \
+	--enable-decoder=h263 \
+	--enable-decoder=h263i \
+	--enable-decoder=h264 \
+	--enable-decoder=mp3 \
+	--enable-decoder=mp3adu \
+	--enable-decoder=mp3adufloat \
+	--enable-decoder=mp3float \
+	--enable-decoder=mp3on4 \
+	--enable-decoder=mp3on4float \
+	--enable-decoder=mpeg1video \
+	--enable-decoder=mpeg2video \
+	--enable-decoder=mpeg4 \
+	--enable-decoder=mpeg4v1 \
+	--enable-decoder=mpeg4v2 \
+	--enable-decoder=mpeg4v3 \
+	--enable-decoder=vp3 \
+	--enable-decoder=vp5 \
+	--enable-decoder=vp6 \
+	--enable-decoder=vp6a \
+	--enable-decoder=vp6f \
+	--enable-decoder=vp8 \
+	--enable-decoder=vc1 \
+	--enable-decoder=vc1_vdpau \
+	--enable-decoder=vc1image \
 	--disable-debug \
 	--disable-avdevice \
 	--disable-devices \
@@ -24,7 +60,7 @@ FFMPEGCONF = \
 #	--disable-ffserver \
 #	--disable-ffplay \
 #	--disable-ffprobe
-DEPS_ffmpeg = zlib gsm openjpeg
+DEPS_ffmpeg = zlib
 
 # Optional dependencies
 ifdef BUILD_ENCODERS
