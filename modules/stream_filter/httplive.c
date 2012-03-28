@@ -1085,6 +1085,7 @@ static int parse_M3U8(stream_t *s, vlc_array_t *streams, uint8_t *buffer, const 
         /* */
         bool media_sequence_loaded = false;
         int segment_duration = -1;
+        int total_duration_secs = 0;
         do
         {
             /* Next line */
@@ -1094,7 +1095,14 @@ static int parse_M3U8(stream_t *s, vlc_array_t *streams, uint8_t *buffer, const 
             p_begin = p_read;
 
             if (strncmp(line, "#EXTINF", 7) == 0)
+            {
+                segment_duration = 0;
                 err = parse_SegmentInformation(hls, line, &segment_duration);
+                if (err == VLC_SUCCESS && segment_duration > 0)
+                {
+                    total_duration_secs += segment_duration;
+                }
+            }
             else if (strncmp(line, "#EXT-X-TARGETDURATION", 21) == 0)
                 err = parse_TargetDuration(s, hls, line);
             else if (strncmp(line, "#EXT-X-MEDIA-SEQUENCE", 21) == 0)
@@ -1132,6 +1140,12 @@ static int parse_M3U8(stream_t *s, vlc_array_t *streams, uint8_t *buffer, const 
                 break;
 
         } while (err == VLC_SUCCESS);
+
+        if (err == VLC_SUCCESS && total_duration_secs > 0)
+        {
+            var_Create(s, "httplive-total-duration", VLC_VAR_INTEGER);
+            var_SetInteger(s, "httplive-total-duration", ((int64_t)total_duration_secs) * 1000 * 1000);
+        }
 
         free(line);
     }
@@ -2432,6 +2446,7 @@ static int segment_Seek(stream_t *s, const uint64_t pos)
 
     bool b_found = false;
     uint64_t length = 0;
+    uint64_t segment_start_secs = 0;
     uint64_t size = hls->size;
     int count = vlc_array_count(hls->segments);
 
@@ -2467,6 +2482,8 @@ static int segment_Seek(stream_t *s, const uint64_t pos)
             vlc_mutex_unlock(&hls->lock);
             return VLC_EGENERIC;
         }
+
+        segment_start_secs += segment->duration;
     }
 
     /* */
@@ -2479,6 +2496,8 @@ static int segment_Seek(stream_t *s, const uint64_t pos)
     /* */
     if (b_found)
     {
+        var_Create(s, "httplive-segment-start-time", VLC_VAR_INTEGER);
+        var_SetInteger(s, "httplive-segment-start-time", segment_start_secs * 1000 * 1000);
 
         /* restore current segment to start position */
         vlc_mutex_lock(&currentSegment->lock);
