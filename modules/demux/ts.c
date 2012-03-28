@@ -330,6 +330,14 @@ struct demux_sys_t
 
     /* */
     bool        b_start_record;
+
+    /* */
+    mtime_t     i_httplive_total_duration;  /* total duration parsed from m3u */
+
+    /* */
+    mtime_t     i_segment_start_time; /* as start time after resync pcr */
+    mtime_t     i_resync_first_pcr; /* first pcr after resync */
+    bool        b_need_resync_pcr;
 };
 
 static int Demux    ( demux_t *p_demux );
@@ -787,6 +795,14 @@ static int Open( vlc_object_t *p_this )
         if( p_demux->pf_demux( p_demux ) != 1 )
             break;
     }
+
+    /* obtain total duration parsed from m3u file */
+    p_sys->i_httplive_total_duration = var_InheritInteger( p_demux->s, "httplive-total-duration" );
+
+    p_sys->i_segment_start_time = -1;
+    p_sys->i_resync_first_pcr = -1;
+    p_sys->b_need_resync_pcr = false;
+
     return VLC_SUCCESS;
 }
 
@@ -1058,6 +1074,20 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             {
                 *pi64 = 0;
             }
+
+            /* add i_segment_start_time to resync PCR */
+            if (*pi64 == 0 &&
+                p_sys->i_segment_start_time >= 0 &&
+                p_sys->i_current_pcr - p_sys->i_resync_first_pcr >= 0)
+            {
+                *pi64 = (p_sys->i_current_pcr - p_sys->i_resync_first_pcr) * 100 / 9;
+                *pi64 = *pi64 + p_sys->i_segment_start_time;
+            }
+
+            if (*pi64 == 0 && p_sys->i_current_pcr - p_sys->i_first_pcr >= 0 )
+            {
+                *pi64 = (p_sys->i_current_pcr - p_sys->i_first_pcr) * 100 / 9;
+            }
         }
         else
         {
@@ -1074,6 +1104,11 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             if( DVBEventInformation( p_demux, NULL, pi64 ) )
             {
                 *pi64 = 0;
+            }
+
+            if( *pi64 == 0 && p_sys->i_httplive_total_duration > 0 )
+            {
+                *pi64 = p_sys->i_httplive_total_duration;
             }
         }
         else
@@ -2155,8 +2190,26 @@ static void PCRHandle( demux_t *p_demux, ts_pid_t *pid, block_t *p_bk )
     if( i_pcr < 0 )
         return;
 
+    /* handle first PCR if not obtain in Open() */
+    if( p_sys->i_pid_ref_pcr == -1 )
+    {
+        p_sys->i_pid_ref_pcr = PIDGet( p_bk );
+        p_sys->i_first_pcr = i_pcr;
+        p_sys->i_current_pcr = i_pcr;
+    }
+
     if( p_sys->i_pid_ref_pcr == pid->i_pid )
+    {
+        /* reset PCR if discontinuitied */
+        if( p_sys->b_need_resync_pcr )
+        {
+            p_sys->i_segment_start_time = var_InheritInteger( p_demux->s, "httplive-segment-start-time" );
+            p_sys->i_resync_first_pcr = i_pcr;
+            p_sys->b_need_resync_pcr = false;
+        }
+
         p_sys->i_current_pcr = AdjustPCRWrapAround( p_demux, i_pcr );
+    }
 
     /* Search program and set the PCR */
     for( int i = 0; i < p_sys->i_pmt; i++ )
@@ -2261,6 +2314,8 @@ static bool GatherData( demux_t *p_demux, ts_pid_t *pid, block_t *p_bk )
         {
             msg_Warn( p_demux, "discontinuity received 0x%x instead of 0x%x (pid=%d)",
                       i_cc, ( pid->i_cc + 1 )&0x0f, pid->i_pid );
+
+            p_demux->p_sys->b_need_resync_pcr = true;
 
             pid->i_cc = i_cc;
             if( pid->es->p_data && pid->es->fmt.i_cat != VIDEO_ES )
