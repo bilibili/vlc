@@ -94,6 +94,10 @@ static void Close( vlc_object_t * );
     "slash, e.g. FooBar/1.2.3. This option can only be specified per input " \
     "item, not globally.")
 
+#define HOSTS_REJECT_RANGE N_("Exclude hosts from range header detection")
+#define HOSTS_REJECT_RANGE_LONGTEXT N_(\
+    "You can disable 'range' header detection which are certern to be rejected. ")
+
 vlc_module_begin ()
     set_description( N_("HTTP input") )
     set_capability( "access", 0 )
@@ -118,6 +122,12 @@ vlc_module_begin ()
         change_safe()
     add_bool( "http-forward-cookies", true, FORWARD_COOKIES_TEXT,
               FORWARD_COOKIES_LONGTEXT, true )
+
+    add_string( "http-hosts-reject-range", NULL,
+               HOSTS_REJECT_RANGE,
+               HOSTS_REJECT_RANGE_LONGTEXT,
+           false )
+
     /* 'itpc' = iTunes Podcast */
     add_shortcut( "http", "https", "unsv", "itpc", "icyx" )
     set_callbacks( Open, Close )
@@ -140,6 +150,8 @@ struct access_sys_t
     char    *psz_user_agent;
     char    *psz_referrer;
     http_auth_t auth;
+
+    char    *psz_hosts_reject_range;
 
     /* Proxy */
     bool b_proxy;
@@ -352,6 +364,13 @@ static int OpenWithCookies( vlc_object_t *p_this, const char *psz_access,
             char *p = strchr(p_sys->psz_user_agent, '(');
             *p = '\0';
         }
+    }
+
+    p_sys->psz_hosts_reject_range = var_InheritString( p_access, "http-hosts-reject-range" );
+    if( p_sys->psz_hosts_reject_range )
+    {
+        msg_Dbg( p_access, "http-hosts-reject-range" );
+        msg_Dbg( p_access, p_sys->psz_hosts_reject_range );
     }
 
     /* HTTP referrer */
@@ -1191,8 +1210,34 @@ static int Request( access_t *p_access, uint64_t i_tell )
     if( p_sys->i_version == 1 && ! p_sys->b_continuous )
     {
         p_sys->b_persist = true;
-        net_Printf( p_access, p_sys->fd, pvs,
-                    "Range: bytes=%"PRIu64"-\r\n", i_tell );
+
+        if ( p_sys->url.psz_host && *p_sys->url.psz_host ) {
+            bool b_reject_range = false;
+            if( p_sys->psz_hosts_reject_range && *p_sys->psz_hosts_reject_range )
+            {
+                int i_host_len = strlen( p_sys->url.psz_host );
+
+                const char* p_host = p_sys->psz_hosts_reject_range;
+                while ( p_host && *p_host ) {
+                    if ( !strncasecmp(p_host, p_sys->url.psz_host, i_host_len )) {
+                        b_reject_range = true;
+                        break;
+                    }
+
+                    p_host = strstr( p_host, "," );
+                    if ( p_host )
+                        p_host++;
+                }
+            }
+
+            if (b_reject_range) {
+                msg_Dbg( p_access, "disable range header detection" );
+            } else {
+                msg_Dbg( p_access, "Range: bytes=%"PRIu64"-\r\n", i_tell );
+                net_Printf( p_access, p_sys->fd, pvs,
+                "Range: bytes=%"PRIu64"-\r\n", i_tell );
+            }
+        }
         net_Printf( p_access, p_sys->fd, pvs, "Connection: close\r\n" );
     }
 
