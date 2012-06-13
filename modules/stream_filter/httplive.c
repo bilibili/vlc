@@ -143,6 +143,10 @@ struct stream_sys_t
     bool        b_live;     /* live stream? or vod? */
     bool        b_error;    /* parsing error */
     bool        b_aesmsg;   /* only print one time that the media is encrypted */
+
+    volatile bool b_close;  /* true if Close called */
+    vlc_mutex_t lock_close; /* for reload and download thread */
+    vlc_cond_t  cond_close; /* for reload and download thread */
 };
 
 /****************************************************************************
@@ -1578,7 +1582,7 @@ static void* hls_Thread(void *p_this)
 
     int canc = vlc_savecancel();
 
-    while (vlc_object_alive(s))
+    while (vlc_object_alive(s) && !p_sys->b_close)
     {
         hls_stream_t *hls = hls_Get(p_sys->hls_stream, p_sys->download.stream);
         assert(hls);
@@ -1601,7 +1605,7 @@ static void* hls_Thread(void *p_this)
                 vlc_cond_wait(&p_sys->download.wait, &p_sys->download.lock_wait);
                 if (p_sys->b_live /*&& (mdate() >= p_sys->playlist.wakeup)*/)
                     break;
-                if (!vlc_object_alive(s))
+                if (!vlc_object_alive(s) || p_sys->b_close)
                     break;
             }
             /* */
@@ -1613,7 +1617,7 @@ static void* hls_Thread(void *p_this)
             vlc_mutex_unlock(&p_sys->download.lock_wait);
         }
 
-        if (!vlc_object_alive(s)) break;
+        if (!vlc_object_alive(s) || p_sys->b_close) break;
 
         vlc_mutex_lock(&hls->lock);
         segment_t *segment = segment_GetSegment(hls, p_sys->download.segment);
@@ -1629,6 +1633,9 @@ static void* hls_Thread(void *p_this)
                 p_sys->b_error = true;
                 break;
             }
+
+            if (p_sys->b_close)
+                break;
         }
 
         /* download succeeded */
@@ -1659,7 +1666,7 @@ static void* hls_Reload(void *p_this)
     int canc = vlc_savecancel();
 
     double wait = 0.5;
-    while (vlc_object_alive(s))
+    while (vlc_object_alive(s) && !p_sys->b_close)
     {
         mtime_t now = mdate();
         if (now >= p_sys->playlist.wakeup)
@@ -1695,7 +1702,9 @@ static void* hls_Reload(void *p_this)
                                                    * (mtime_t)1000000);
         }
 
-        mwait(p_sys->playlist.wakeup);
+        vlc_mutex_lock(&p_sys->lock_close);
+        vlc_cond_timedwait(&p_sys->cond_close, &p_sys->lock_close, p_sys->playlist.wakeup);
+        vlc_mutex_unlock(&p_sys->lock_close);
     }
 
     vlc_restorecancel(canc);
@@ -2036,6 +2045,9 @@ static int Open(vlc_object_t *p_this)
     vlc_mutex_init(&p_sys->download.lock_wait);
     vlc_cond_init(&p_sys->download.wait);
 
+    vlc_mutex_init(&p_sys->lock_close);
+    vlc_cond_init(&p_sys->cond_close);
+
     /* Initialize HLS live stream */
     if (p_sys->b_live)
     {
@@ -2089,6 +2101,7 @@ static void Close(vlc_object_t *p_this)
     assert(p_sys->hls_stream);
 
     /* */
+    p_sys->b_close = true;
     vlc_mutex_lock(&p_sys->download.lock_wait);
     /* negate the condition variable's predicate */
     p_sys->download.segment = p_sys->playback.segment = 0;
@@ -2096,12 +2109,19 @@ static void Close(vlc_object_t *p_this)
     vlc_cond_signal(&p_sys->download.wait);
     vlc_mutex_unlock(&p_sys->download.lock_wait);
 
+    vlc_mutex_lock(&p_sys->lock_close);
+    vlc_cond_signal(&p_sys->cond_close);
+    vlc_mutex_unlock(&p_sys->lock_close);
+
     /* */
     if (p_sys->b_live)
         vlc_join(p_sys->reload, NULL);
     vlc_join(p_sys->thread, NULL);
     vlc_mutex_destroy(&p_sys->download.lock_wait);
     vlc_cond_destroy(&p_sys->download.wait);
+
+    vlc_mutex_destroy(&p_sys->lock_close);
+    vlc_cond_destroy(&p_sys->cond_close);
 
     /* Free hls streams */
     for (int i = 0; i < vlc_array_count(p_sys->hls_stream); i++)
@@ -2293,7 +2313,7 @@ static int Read(stream_t *s, void *buffer, unsigned int i_read)
 
     assert(p_sys->hls_stream);
 
-    if (p_sys->b_error)
+    if (p_sys->b_error || p_sys->b_close)
         return 0;
 
     /* NOTE: buffer might be NULL if caller wants to skip data */
