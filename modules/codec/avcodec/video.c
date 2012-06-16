@@ -465,8 +465,8 @@ picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
 
         p_sys->i_late_frames = 0;
 
-        if( p_block->i_flags & BLOCK_FLAG_DISCONTINUITY )
-            avcodec_flush_buffers( p_context );
+//        if( p_block->i_flags & BLOCK_FLAG_DISCONTINUITY )
+//            avcodec_flush_buffers( p_context );
 
         block_Release( p_block );
         return NULL;
@@ -481,11 +481,11 @@ picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
     }
 
     if( !p_dec->b_pace_control && (p_sys->i_late_frames > 0) &&
-        (mdate() - p_sys->i_late_frames_start > INT64_C(5000000)) )
+        (mdate() - p_sys->i_late_frames_start > INT64_C(50000000)) )
     {
         if( p_sys->i_pts > VLC_TS_INVALID )
         {
-            msg_Err( p_dec, "more than 5 seconds of late video -> "
+            msg_Err( p_dec, "more than 50 seconds of late video -> "
                      "dropping frame (computer too slow ?)" );
             p_sys->i_pts = VLC_TS_INVALID; /* To make sure we recover properly */
         }
@@ -535,6 +535,7 @@ picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
     {
         /* It creates broken picture
          * FIXME either our parser or ffmpeg is broken */
+        b_drawpicture = true;
 #if 0
         if( p_sys->b_hurry_up )
             p_context->skip_frame = __MAX( p_context->skip_frame,
