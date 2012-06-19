@@ -366,6 +366,12 @@ vlc_array_remove( vlc_array_t * p_array, int i_index )
     }
 }
 
+static inline void
+vlc_array_set( vlc_array_t * p_array, void * p_elem, int i_index )
+{
+    p_array->pp_elems[i_index] = p_elem;
+}
+
 
 /************************************************************************
  * Dictionaries
