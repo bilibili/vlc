@@ -120,6 +120,12 @@ enum stream_query_e
 
     /* XXX only data read through stream_Read/Block will be recorded */
     STREAM_SET_RECORD_STATE,     /**< arg1=bool, arg2=const char *psz_ext (if arg1 is true)  res=can fail */
+
+    /* */
+    STREAM_GET_CACHED_SIZE,     /**< arg1= uint64_t *     res=can fail (0 if no sense)*/
+
+    /* for clock gap in youku httplive/mpeg2ts */
+    STREAM_HTTPLIVE_GET_SEGMENT_START,
 };
 
 VLC_API int stream_Read( stream_t *s, void *p_read, int i_read );
