@@ -45,6 +45,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_epg.h \
 	../include/vlc_es.h \
 	../include/vlc_es_out.h \
+	../include/vlc_es_out_managed.h \
 	../include/vlc_events.h \
 	../include/vlc_filter.h \
 	../include/vlc_fourcc.h \
@@ -363,6 +364,7 @@ SOURCES_libvlc_common = \
 	input/demux.c \
 	input/es_out.c \
 	input/es_out_timeshift.c \
+	input/es_out_managed.c \
 	input/event.c \
 	input/input.c \
 	input/info.h \
