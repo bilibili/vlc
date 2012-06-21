@@ -2045,6 +2045,8 @@ static void PCRHandle( demux_t *p_demux, ts_pid_t *pid, block_t *p_bk )
     if( i_pcr < 0 )
         return;
 
+    mtime_t i_prev_pcr = p_sys->i_current_pcr;
+
     /* handle first PCR if not obtain in Open() */
     if( p_sys->i_pid_ref_pcr == -1 )
     {
@@ -2055,11 +2057,33 @@ static void PCRHandle( demux_t *p_demux, ts_pid_t *pid, block_t *p_bk )
 
     if( p_sys->i_pid_ref_pcr == pid->i_pid )
     {
+        if( i_prev_pcr > 0 && i_prev_pcr > i_pcr )
+        {
+            p_sys->b_need_resync_pcr = true;
+        }
+        else
         /* reset PCR if discontinuitied */
         if( p_sys->b_need_resync_pcr )
         {
-            p_sys->i_segment_start_time = var_InheritInteger( p_demux->s, "httplive-segment-start-time" );
-            p_sys->i_resync_first_pcr = i_pcr;
+            int64_t i_segment_start = 0;
+            if( VLC_SUCCESS == stream_Control(p_demux->s, STREAM_HTTPLIVE_GET_SEGMENT_START, &i_segment_start ) &&
+               i_segment_start >= 0) {
+                char buf[256];
+                sprintf( buf, "pcr gap %lld => %lld, resync reference start from %lld to %lld",
+                        i_prev_pcr, i_pcr,
+                        p_sys->i_segment_start_time,
+                        i_segment_start);
+                msg_Warn( p_demux, buf );
+                p_sys->i_segment_start_time = i_segment_start;
+                p_sys->i_resync_first_pcr = i_pcr;
+            }
+            else
+            {
+                msg_Err( p_demux, "failed to resync" );
+                p_sys->i_segment_start_time = var_InheritInteger( p_demux->s, "httplive-segment-start-time" );
+                p_sys->i_resync_first_pcr = i_pcr;
+            }
+
             p_sys->b_need_resync_pcr = false;
         }
 

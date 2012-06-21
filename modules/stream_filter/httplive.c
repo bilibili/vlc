@@ -64,6 +64,7 @@ vlc_module_end()
 typedef struct segment_s
 {
     int         sequence;   /* unique sequence number */
+    int         start_time; /* segment start time (seconds) */
     int         duration;   /* segment duration (seconds) */
     uint64_t    size;       /* segment size in bytes */
     uint64_t    bandwidth;  /* bandwidth usage of segments (bits per second)*/
@@ -125,6 +126,7 @@ struct stream_sys_t
         uint64_t    offset;     /* current offset in media */
         int         stream;     /* current hls_stream  */
         int         segment;    /* current segment for playback */
+        int         current_segment_start_time; /* (seconds) */
     } playback;
 
     /* Playlist */
@@ -360,12 +362,13 @@ static uint64_t hls_GetStreamSize(hls_stream_t *hls)
 }
 
 /* Segment */
-static segment_t *segment_New(hls_stream_t* hls, const int duration, const char *uri)
+static segment_t *segment_New(hls_stream_t* hls, const int start_time, const int duration, const char *uri)
 {
     segment_t *segment = (segment_t *)malloc(sizeof(segment_t));
     if (segment == NULL)
         return NULL;
 
+    segment->start_time = start_time; /* seconds */
     segment->duration = duration; /* seconds */
     segment->size = 0; /* bytes */
     segment->sequence = 0;
@@ -615,7 +618,7 @@ static int parse_SegmentInformation(hls_stream_t *hls, char *p_read, int *durati
     return VLC_SUCCESS;
 }
 
-static int parse_AddSegment(hls_stream_t *hls, const int duration, const char *uri)
+static int parse_AddSegment(hls_stream_t *hls, const int start_time, const int duration, const char *uri)
 {
     assert(hls);
     assert(uri);
@@ -625,7 +628,7 @@ static int parse_AddSegment(hls_stream_t *hls, const int duration, const char *u
 
     char *psz_uri = relative_URI(hls->url, uri);
 
-    segment_t *segment = segment_New(hls, duration, psz_uri ? psz_uri : uri);
+    segment_t *segment = segment_New(hls, start_time, duration, psz_uri ? psz_uri : uri);
     if (segment)
         segment->sequence = hls->sequence + vlc_array_count(hls->segments) - 1;
     free(psz_uri);
@@ -1085,7 +1088,7 @@ static int parse_M3U8(stream_t *s, vlc_array_t *streams, uint8_t *buffer, const 
         /* */
         bool media_sequence_loaded = false;
         int segment_duration = -1;
-        int total_duration_secs = 0;
+        int next_start_time = 0;
         do
         {
             /* Next line */
@@ -1098,10 +1101,6 @@ static int parse_M3U8(stream_t *s, vlc_array_t *streams, uint8_t *buffer, const 
             {
                 segment_duration = 0;
                 err = parse_SegmentInformation(hls, line, &segment_duration);
-                if (err == VLC_SUCCESS && segment_duration > 0)
-                {
-                    total_duration_secs += segment_duration;
-                }
             }
             else if (strncmp(line, "#EXT-X-TARGETDURATION", 21) == 0)
                 err = parse_TargetDuration(s, hls, line);
@@ -1129,7 +1128,9 @@ static int parse_M3U8(stream_t *s, vlc_array_t *streams, uint8_t *buffer, const 
                 err = parse_EndList(s, hls);
             else if ((strncmp(line, "#", 1) != 0) && (*line != '\0') )
             {
-                err = parse_AddSegment(hls, segment_duration, line);
+                err = parse_AddSegment(hls, next_start_time, segment_duration, line);
+                if (segment_duration > 0)
+                    next_start_time += segment_duration;
                 segment_duration = -1; /* reset duration */
             }
 
@@ -1141,10 +1142,10 @@ static int parse_M3U8(stream_t *s, vlc_array_t *streams, uint8_t *buffer, const 
 
         } while (err == VLC_SUCCESS);
 
-        if (err == VLC_SUCCESS && total_duration_secs > 0)
+        if (err == VLC_SUCCESS && next_start_time > 0)
         {
             var_Create(s, "httplive-total-duration", VLC_VAR_INTEGER);
-            var_SetInteger(s, "httplive-total-duration", ((int64_t)total_duration_secs) * 1000 * 1000);
+            var_SetInteger(s, "httplive-total-duration", ((int64_t)next_start_time) * 1000 * 1000);
         }
 
         free(line);
@@ -2017,6 +2018,7 @@ static int Open(vlc_object_t *p_this)
     /* Choose first HLS stream to start with */
     int current = p_sys->playback.stream = 0;
     p_sys->playback.segment = p_sys->download.segment = ChooseSegment(s, current);
+    p_sys->playback.current_segment_start_time = 0;
 
     /* manage encryption key if needed */
     hls_ManageSegmentKeys(s, hls_Get(p_sys->hls_stream, current));
@@ -2246,11 +2248,13 @@ static ssize_t hls_Read(stream_t *s, uint8_t *p_read, unsigned int i_read)
             else
                 segment_RestorePos(segment);
 
+            int current_segment_start_time = segment->start_time;
             vlc_mutex_unlock(&segment->lock);
 
             /* signal download thread */
             vlc_mutex_lock(&p_sys->download.lock_wait);
             p_sys->playback.segment++;
+            p_sys->playback.current_segment_start_time = current_segment_start_time;
             vlc_cond_signal(&p_sys->download.wait);
             vlc_mutex_unlock(&p_sys->download.lock_wait);
             continue;
@@ -2514,6 +2518,7 @@ static int segment_Seek(stream_t *s, const uint64_t pos)
 
         vlc_mutex_lock(&segment->lock);
         segment_RestorePos(segment);
+        p_sys->playback.current_segment_start_time = segment->start_time;
         vlc_mutex_unlock(&segment->lock);
 
         /* start download at current playback segment */
@@ -2540,6 +2545,19 @@ static int segment_Seek(stream_t *s, const uint64_t pos)
     vlc_mutex_unlock(&hls->lock);
 
     return b_found ? VLC_SUCCESS : VLC_EGENERIC;
+}
+
+static int hls_GetCurrentSegmentStartTime(stream_t *s, int64_t* p_segment_start_time)
+{
+    stream_sys_t *p_sys = s->p_sys;
+
+    *p_segment_start_time = ((int64_t)p_sys->playback.current_segment_start_time) * 1000 * 1000;
+    if (*p_segment_start_time < 0)
+    {
+        msg_Err (s, "*p_segment_start_time < 0");
+    }
+
+    return VLC_SUCCESS;
 }
 
 static int Control(stream_t *s, int i_query, va_list args)
@@ -2573,6 +2591,17 @@ static int Control(stream_t *s, int i_query, va_list args)
         case STREAM_GET_SIZE:
             *(va_arg (args, uint64_t *)) = GetStreamSize(s);
             break;
+        case STREAM_HTTPLIVE_GET_SEGMENT_START:
+            {
+                msg_Warn(s, "STREAM_HTTPLIVE_GET_SEGMENT_START");
+                int64_t segment_start = 0;
+                if (VLC_SUCCESS == hls_GetCurrentSegmentStartTime(s, &segment_start) && segment_start >= 0)
+                {
+                    *(va_arg (args, int64_t *)) = segment_start;
+                    return VLC_SUCCESS;
+                }
+            }
+            return VLC_EGENERIC;
         default:
             return VLC_EGENERIC;
     }
