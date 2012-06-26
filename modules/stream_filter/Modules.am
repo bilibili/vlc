@@ -118,6 +118,12 @@ libstream_filter_ringbuf_plugin_la_LIBADD = $(AM_LIBADD)
 libstream_filter_ringbuf_plugin_la_DEPENDENCIES =
 libvlc_LTLIBRARIES += libstream_filter_ringbuf_plugin.la
 
+libstream_filter_membuf_plugin_la_SOURCES = membuf.c
+libstream_filter_membuf_plugin_la_CFLAGS = $(AM_CFLAGS)
+libstream_filter_membuf_plugin_la_LIBADD = $(AM_LIBADD)
+libstream_filter_membuf_plugin_la_DEPENDENCIES =
+libvlc_LTLIBRARIES += libstream_filter_membuf_plugin.la
+
 librecord_plugin_la_SOURCES = record.c
 librecord_plugin_la_CFLAGS = $(AM_CFLAGS)
 librecord_plugin_la_LIBADD = $(AM_LIBADD)
