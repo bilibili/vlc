@@ -100,7 +100,9 @@ enum libvlc_event_e {
     libvlc_VlmMediaInstanceStatusPlaying,
     libvlc_VlmMediaInstanceStatusPause,
     libvlc_VlmMediaInstanceStatusEnd,
-    libvlc_VlmMediaInstanceStatusError
+    libvlc_VlmMediaInstanceStatusError,
+
+    libvlc_MediaPlayerBufferingTotal=0x700,
 };
 
 /**
@@ -167,6 +169,10 @@ typedef struct libvlc_event_t
         {
             int new_count;
         } media_player_vout;
+        struct
+        {
+            float new_cache_total;
+        } media_player_buffering_total;
 
         /* media list */
         struct

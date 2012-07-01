@@ -635,7 +635,8 @@ static int AStreamControl( stream_t *s, int i_query, va_list args )
                 AStreamControlReset( s );
             return ret;
         }
-
+        case STREAM_GET_CACHED_SIZE:
+            return VLC_EGENERIC;
         case STREAM_SET_RECORD_STATE:
         default:
             msg_Err( s, "invalid stream_vaControl query=0x%x", i_query );

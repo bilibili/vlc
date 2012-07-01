@@ -299,6 +299,13 @@ input_event_changed( vlc_object_t * p_this, char const * psz_cmd,
             var_GetFloat( p_input, "cache" ));
         libvlc_event_send( p_mi->p_event_manager, &event );
     }
+    else if( newval.i_int == INPUT_EVENT_CACHE_TOTAL )
+    {
+        event.type = libvlc_MediaPlayerBufferingTotal;
+        event.u.media_player_buffering_total.new_cache_total = (int)(100 *
+                                                         var_GetFloat( p_input, "cache-total" ));
+        libvlc_event_send( p_mi->p_event_manager, &event );
+    }
     else if( newval.i_int == INPUT_EVENT_VOUT )
     {
         vout_thread_t **pp_vout;
@@ -502,6 +509,8 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     register_event(mp, SnapshotTaken);
 
     register_event(mp, MediaChanged);
+
+    register_event(mp, BufferingTotal);
 
     /* Attach a var callback to the global object to provide the glue between
      * vout_thread that generates the event and media_player that re-emits it

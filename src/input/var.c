@@ -501,6 +501,9 @@ void input_ConfigVarInit ( input_thread_t *p_input )
     var_Create( p_input, "cache", VLC_VAR_FLOAT );
     var_SetFloat( p_input, "cache", 0.0 );
 
+    var_Create( p_input, "cache-total", VLC_VAR_FLOAT );
+    var_SetFloat( p_input, "cache-total", 0.0 );
+
     /* */
     var_Create( p_input, "input-record-native", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
 

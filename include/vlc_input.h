@@ -400,6 +400,9 @@ typedef enum input_event_type_e
     /* A vout_thread_t object has been created/deleted by *the input* */
     INPUT_EVENT_VOUT,
 
+    /* "cache-total" has changed */
+    INPUT_EVENT_CACHE_TOTAL,
+
 } input_event_type_e;
 
 /**
