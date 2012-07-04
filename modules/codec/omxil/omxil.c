@@ -939,6 +939,9 @@ static int OpenDecoder( vlc_object_t *p_this )
     if( 0 || !GetOmxRole(p_dec->fmt_in.i_codec, p_dec->fmt_in.i_cat, false) )
         return VLC_EGENERIC;
 
+    if( p_dec->fmt_in.i_cat != VIDEO_ES )
+        return VLC_EGENERIC;
+
     status = OpenGeneric( p_this, false );
     if(status != VLC_SUCCESS) return status;
 
