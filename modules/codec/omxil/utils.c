@@ -992,3 +992,93 @@ void PrintOmx(decoder_t *p_dec, OMX_HANDLETYPE omx_handle, OMX_U32 i_port)
         }
     }
 }
+
+const char *H264ProfileToString(int profile_id)
+{
+    OMX_VIDEO_AVCPROFILETYPE omx_profile = H264ProfileToOmxType(profile_id);
+    return OmxProfileTypeToString(omx_profile);
+}
+
+const char *OmxProfileTypeToString(OMX_VIDEO_AVCPROFILETYPE omx_profile)
+{
+    switch(omx_profile)
+    {
+        case OMX_VIDEO_AVCProfileBaseline:    return "Baseline";
+        case OMX_VIDEO_AVCProfileMain:        return "Main";
+        case OMX_VIDEO_AVCProfileExtended:    return "Extended";
+        case OMX_VIDEO_AVCProfileHigh:        return "High";
+        case OMX_VIDEO_AVCProfileHigh10:      return "High 10";
+        case OMX_VIDEO_AVCProfileHigh422:     return "High 422";
+        case OMX_VIDEO_AVCProfileHigh444:     return "High 444";
+        default: return "Unknown";
+    }
+}
+
+OMX_VIDEO_AVCPROFILETYPE H264ProfileToOmxType(int profile_id)
+{
+    switch(profile_id)
+    {
+        case H264_PROFILE_BASELINE:     return OMX_VIDEO_AVCProfileBaseline;
+        case H264_PROFILE_MAIN:         return OMX_VIDEO_AVCProfileMain;
+        case H264_PROFILE_EXTENDED:     return OMX_VIDEO_AVCProfileExtended;
+        case H264_PROFILE_HIGH:         return OMX_VIDEO_AVCProfileHigh;
+        case H264_PROFILE_HIGH_10:      return OMX_VIDEO_AVCProfileHigh10;
+        case H264_PROFILE_HIGH_422:     return OMX_VIDEO_AVCProfileHigh422;
+        case H264_PROFILE_HIGH_444:     return OMX_VIDEO_AVCProfileHigh444;
+        default: return OMX_VIDEO_AVCProfileMax;
+    }
+}
+
+uint8_t OmxLevelTypeToH264Level(OMX_VIDEO_AVCLEVELTYPE omx_level)
+{
+    switch(omx_level)
+    {
+        case OMX_VIDEO_AVCLevel1:   return 10;  /* 0x01,    Level 1 */
+#if 0
+            /* FIXME: dunno how to mean 1b in omxil plugin */
+        case OMX_VIDEO_AVCLevel1b:  return 1b;  /* 0x02,    Level 1b */
+#endif
+        case OMX_VIDEO_AVCLevel11:  return 11;  /* 0x04,    Level 1.1 */
+        case OMX_VIDEO_AVCLevel12:  return 12;  /* 0x08,    Level 1.2 */
+        case OMX_VIDEO_AVCLevel13:  return 13;  /* 0x10,    Level 1.3 */
+        case OMX_VIDEO_AVCLevel2:   return 20;  /* 0x20,    Level 2 */
+        case OMX_VIDEO_AVCLevel21:  return 21;  /* 0x40,    Level 2.1 */
+        case OMX_VIDEO_AVCLevel22:  return 22;  /* 0x80,    Level 2.2 */
+        case OMX_VIDEO_AVCLevel3:   return 30;  /* 0x100,   Level 3 */
+        case OMX_VIDEO_AVCLevel31:  return 31;  /* 0x200,   Level 3.1 */
+        case OMX_VIDEO_AVCLevel32:  return 32;  /* 0x400,   Level 3.2 */
+        case OMX_VIDEO_AVCLevel4:   return 40;  /* 0x800,   Level 4 */
+        case OMX_VIDEO_AVCLevel41:  return 41;  /* 0x1000,  Level 4.1 */
+        case OMX_VIDEO_AVCLevel42:  return 42;  /* 0x2000,  Level 4.2 */
+        case OMX_VIDEO_AVCLevel5:   return 50;  /* 0x4000,  Level 5 */
+        case OMX_VIDEO_AVCLevel51:  return 51;  /* 0x8000,  Level 5.1 */
+        default:    return 0;
+    }
+}
+
+OMX_VIDEO_AVCLEVELTYPE H264LevelToOmxType(int level)
+{
+    switch(level)
+    {
+        case 10:    return OMX_VIDEO_AVCLevel1;   /* 0x01,    Level 1 */
+#if 0
+        /* FIXME: dunno how to mean 1b in omxil plugin */
+        case 1b:    return OMX_VIDEO_AVCLevel1b:  /* 0x02,    Level 1b */
+#endif
+        case 11:    return OMX_VIDEO_AVCLevel11;  /* 0x04,    Level 1.1 */
+        case 12:    return OMX_VIDEO_AVCLevel12;  /* 0x08,    Level 1.2 */
+        case 13:    return OMX_VIDEO_AVCLevel13;  /* 0x10,    Level 1.3 */
+        case 20:    return OMX_VIDEO_AVCLevel2;   /* 0x20,    Level 2 */
+        case 21:    return OMX_VIDEO_AVCLevel21;  /* 0x40,    Level 2.1 */
+        case 22:    return OMX_VIDEO_AVCLevel22;  /* 0x80,    Level 2.2 */
+        case 30:    return OMX_VIDEO_AVCLevel3;   /* 0x100,   Level 3 */
+        case 31:    return OMX_VIDEO_AVCLevel31;  /* 0x200,   Level 3.1 */
+        case 32:    return OMX_VIDEO_AVCLevel32;  /* 0x400,   Level 3.2 */
+        case 40:    return OMX_VIDEO_AVCLevel4;   /* 0x800,   Level 4 */
+        case 41:    return OMX_VIDEO_AVCLevel41;  /* 0x1000,  Level 4.1 */
+        case 42:    return OMX_VIDEO_AVCLevel42;  /* 0x2000,  Level 4.2 */
+        case 50:    return OMX_VIDEO_AVCLevel5;   /* 0x4000,  Level 5 */
+        case 51:    return OMX_VIDEO_AVCLevel51;  /* 0x8000,  Level 5.1 */
+        default:    return OMX_VIDEO_AVCLevelMax;
+    }
+}

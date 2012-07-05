@@ -133,6 +133,115 @@ static OMX_ERRORTYPE ImplementationSpecificWorkarounds(decoder_t *p_dec,
         break;
     }
 
+    /* Check H264 profile and level */
+    if(p_fmt->i_cat == VIDEO_ES &&
+       def->eDir == OMX_DirInput &&
+       p_fmt->i_codec == VLC_CODEC_H264)
+    {
+        OMX_VIDEO_AVCPROFILETYPE omx_video_profile = H264ProfileToOmxType(i_profile);
+        OMX_VIDEO_AVCLEVELTYPE omx_video_level = H264LevelToOmxType(i_level);
+
+        msg_Info(p_dec, "Video: H264 %s Profile (%d) (0x%x), Level %d (0x%x)",
+                 H264ProfileToString( i_profile ),
+                 i_profile, omx_video_profile,
+                 i_level, omx_video_level);
+
+        /*
+         * FIXME: Not sure if profile and level parsed from video are reliable.
+         * But for invalid video profile and level, no check will happen.
+         */
+        if(OMX_VIDEO_AVCProfileMax != omx_video_profile &&
+           OMX_VIDEO_AVCLevelMax != omx_video_level)
+        {
+            bool b_match_capability = false;
+
+            OMX_VIDEO_PARAM_PROFILELEVELTYPE param;
+            OMX_INIT_STRUCTURE(param);
+            param.nPortIndex = p_port->i_port_index;
+
+            if(!strcmp(p_sys->psz_component, "OMX.Nvidia.h264.decode") ||
+               !strcmp(p_sys->psz_component, "OMX.Nvidia.h264ext.decode"))
+            {
+                /*
+                 * OMX.NVidia.h264*.decode support High Porfile 3.1,
+                 * but no param return
+                 */
+                bool b_profile_match = false;
+                if((H264_PROFILE_HIGH >= omx_video_profile) &&
+                   (OMX_VIDEO_AVCLevel4 >= omx_video_level))
+                {
+                    b_profile_match = true;
+                    b_match_capability = true;
+                }
+
+                msg_Info(p_dec, "%s %s ",
+                         p_sys->psz_component,
+                         b_profile_match ? "meet" : "ignore");
+            }
+            else if(!strcmp(p_sys->psz_component, "OMX.SEC.avcdec"))
+            {
+                /*
+                 * OMX.SEC.avcdec support High Porfile 4.1,
+                 * but param returns as Baseline Profile 1
+                 */
+                bool b_profile_match = false;
+                if((H264_PROFILE_HIGH >= omx_video_profile) &&
+                   (OMX_VIDEO_AVCLevel41 >= omx_video_level))
+                {
+                    b_profile_match = true;
+                    b_match_capability = true;
+                }
+
+                msg_Info(p_dec, "%s %s ",
+                         p_sys->psz_component,
+                         b_profile_match ? "meet" : "ignore");
+            }
+            for(param.nProfileIndex = 0; ; ++param.nProfileIndex)
+            {
+                OMX_ERRORTYPE omx_error;
+                omx_error = OMX_GetParameter(p_port->omx_handle,
+                                             OMX_IndexParamVideoProfileLevelQuerySupported, &param);
+                if(omx_error != OMX_ErrorNone)
+                    break;
+
+                bool b_profile_match = false;
+                if((param.eProfile >= omx_video_profile) &&
+                   (param.eLevel >= omx_video_level))
+                {
+                    b_profile_match = true;
+                    b_match_capability = true;
+                }
+
+                msg_Info(p_dec, "%s decoder profile: H264 %s Profile (%d), Level %d (0x%x)",
+                         b_profile_match ? "meet" : "ignore",
+                         OmxProfileTypeToString(param.eProfile),
+                         (int)param.eProfile,
+                         OmxLevelTypeToH264Level(param.eLevel),
+                         (int)param.eLevel);
+            }
+
+#if 0
+            if(param.nProfileIndex <= 0)
+            {
+                /*
+                 * FIXME: Mstorsjo suggests that we should assume it can handle anything,
+                 * if it returns nothing. But since this is the last chance we can diable it,
+                 * I think SW decoder is better than HW decoder we do not know.
+                 *
+                 * Fow now, just make it behave like it did before. -- bbcallen
+                 */
+                msg_Warn(p_dec, "OMX_IndexParamVideoProfileLevelQuerySupported returns nothing");
+            }
+            else if(!b_match_capability)
+#endif
+            if(!b_match_capability)
+            {
+                msg_Err(p_dec, "Vodeo profile level is too high for decoder");
+                return OMX_ErrorNotImplemented;
+            }
+        }
+    }
+
     if(!strcmp(p_sys->psz_component, "OMX.TI.Video.Decoder"))
     {
         if(p_fmt->i_cat == VIDEO_ES && def->eDir == OMX_DirInput &&
@@ -817,7 +926,10 @@ static int OpenGeneric( vlc_object_t *p_this, bool b_encode )
     p_sys->p_ports = &p_sys->in;
     p_sys->b_use_pts = 0;
 
-    msg_Dbg(p_dec, "fmt in:%4.4s, out: %4.4s", (char *)&p_dec->fmt_in.i_codec,
+    msg_Dbg(p_dec, "fmt in:%4.4s %dx%d@%d, out: %4.4s", (char *)&p_dec->fmt_in.i_codec,
+            p_dec->fmt_in.video.i_width,
+            p_dec->fmt_in.video.i_height,
+            p_dec->fmt_in.video.i_frame_rate / 1000,
             (char *)&p_dec->fmt_out.i_codec);
 
     /* Enumerate components and build a list of the one we want to try */

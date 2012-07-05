@@ -242,3 +242,26 @@ unsigned int GetAudioParamSize(OMX_INDEXTYPE index);
 #define OMX_TI_COLOR_FormatYUV420PackedSemiPlanar 0x7F000100
 #define QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka 0x7FA30C03
 #define OMX_IndexVendorSetYUV420pMode 0x7f000003
+
+/*****************************************************************************
+ * H264 profile level numbers
+ *****************************************************************************/
+#define H264_PROFILE_BASELINE   0x42
+#define H264_PROFILE_MAIN       0x4d
+#define H264_PROFILE_EXTENDED   0x58
+#define H264_PROFILE_HIGH       0x64
+#define H264_PROFILE_HIGH_10    0x6e
+#define H264_PROFILE_HIGH_422   0x7a
+#define H264_PROFILE_HIGH_444   0xf4
+
+/* Return "unknown" for unknown profile */
+const char *H264ProfileToString(int profile_id);
+/* Return "unknown" for unknown profile */
+const char *OmxProfileTypeToString(OMX_VIDEO_AVCPROFILETYPE omx_profile);
+/* Return OMX_VIDEO_AVCProfileMax for unknown level */
+OMX_VIDEO_AVCPROFILETYPE H264ProfileToOmxType(int profile_id);
+
+/* Return 0 for unknown level */
+uint8_t OmxLevelTypeToH264Level(OMX_VIDEO_AVCLEVELTYPE omx_profile);
+/* Return OMX_VIDEO_AVCLevelMax for unknown level */
+OMX_VIDEO_AVCLEVELTYPE H264LevelToOmxType(int level);
