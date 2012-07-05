@@ -265,3 +265,26 @@ bool h264_get_profile_level(const es_format_t *p_fmt, size_t *p_profile, size_t 
 size_t convert_omx_to_profile_idc(OMX_VIDEO_AVCPROFILETYPE profile_type);
 
 size_t convert_omx_to_level_idc(OMX_VIDEO_AVCLEVELTYPE level_type);
+
+/*****************************************************************************
+ * H264 profile level numbers
+ *****************************************************************************/
+#define H264_PROFILE_BASELINE   0x42
+#define H264_PROFILE_MAIN       0x4d
+#define H264_PROFILE_EXTENDED   0x58
+#define H264_PROFILE_HIGH       0x64
+#define H264_PROFILE_HIGH_10    0x6e
+#define H264_PROFILE_HIGH_422   0x7a
+#define H264_PROFILE_HIGH_444   0xf4
+
+/* Return "unknown" for unknown profile */
+const char *H264ProfileToString(int profile_id);
+/* Return "unknown" for unknown profile */
+const char *OmxProfileTypeToString(OMX_VIDEO_AVCPROFILETYPE omx_profile);
+/* Return OMX_VIDEO_AVCProfileMax for unknown level */
+OMX_VIDEO_AVCPROFILETYPE H264ProfileToOmxType(int profile_id);
+
+/* Return 0 for unknown level */
+uint8_t OmxLevelTypeToH264Level(OMX_VIDEO_AVCLEVELTYPE omx_profile);
+/* Return OMX_VIDEO_AVCLevelMax for unknown level */
+OMX_VIDEO_AVCLEVELTYPE H264LevelToOmxType(int level);
