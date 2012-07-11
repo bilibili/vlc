@@ -169,7 +169,7 @@ static bool isHTTPLiveStreaming(stream_t *s)
 {
     const uint8_t *peek;
 
-    int size = stream_Peek(s->p_source, &peek, 46);
+    int size = stream_Peek(s->p_source, &peek, 100);
     if (size < 7)
         return false;
 
