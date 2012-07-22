@@ -41,7 +41,7 @@
 #include "omxil_core.h"
 
 #ifndef NDEBUG
-# define OMXIL_EXTRA_DEBUG
+//# define OMXIL_EXTRA_DEBUG
 #endif
 
 #define SENTINEL_FLAG 0x10000
