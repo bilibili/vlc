@@ -44,6 +44,10 @@ void input_SendEventSignal( input_thread_t *p_input, double f_quality, double f_
 void input_SendEventState( input_thread_t *p_input, int i_state );
 void input_SendEventCache( input_thread_t *p_input, double f_level );
 void input_SendEventCacheTotal( input_thread_t *p_input, double f_level );
+void input_SendEventModuleChanged_VideoDecoder( input_thread_t *p_input, const char *p_decoder );
+void input_SendEventModuleChanged_AudioDecoder( input_thread_t *p_input, const char *p_decoder );
+void input_SendEventModuleChanged_VideoDecoderImpl( input_thread_t *p_input, const char *p_decoder_impl );
+void input_SendEventModuleChanged_AudioDecoderImpl( input_thread_t *p_input, const char *p_decoder_impl );
 
 /* TODO rename Item* */
 void input_SendEventMeta( input_thread_t *p_input );
