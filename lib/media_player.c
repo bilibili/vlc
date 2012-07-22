@@ -306,6 +306,15 @@ input_event_changed( vlc_object_t * p_this, char const * psz_cmd,
                                                          var_GetFloat( p_input, "cache-total" ));
         libvlc_event_send( p_mi->p_event_manager, &event );
     }
+    else if (newval.i_int == INPUT_EVENT_MODULE_CHANGED )
+    {
+        event.type = libvlc_MediaPlayerModuleChanged;
+        event.u.media_player_module_changed.psz_video_decoder = var_GetString( p_input, "module-video-decoder" );
+        event.u.media_player_module_changed.psz_audio_decoder = var_GetString( p_input, "module-audio-decoder" );
+        event.u.media_player_module_changed.psz_video_decoder_impl = var_GetString( p_input, "module-video-decoder-impl" );
+        event.u.media_player_module_changed.psz_audio_decoder_impl = var_GetString( p_input, "module-audio-decoder-impl" );
+        libvlc_event_send( p_mi->p_event_manager, &event );
+    }
     else if( newval.i_int == INPUT_EVENT_VOUT )
     {
         vout_thread_t **pp_vout;
@@ -511,6 +520,7 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     register_event(mp, MediaChanged);
 
     register_event(mp, BufferingTotal);
+    register_event(mp, ModuleChanged);
 
     /* Attach a var callback to the global object to provide the glue between
      * vout_thread that generates the event and media_player that re-emits it

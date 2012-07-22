@@ -205,6 +205,30 @@ void input_SendEventCacheTotal( input_thread_t *p_input, double f_level )
     Trigger( p_input, INPUT_EVENT_CACHE_TOTAL );
 }
 
+void input_SendEventModuleChanged_VideoDecoder( input_thread_t *p_input, const char *p_decoder )
+{
+    var_SetString( p_input, "module-video-decoder", p_decoder );
+    Trigger( p_input, INPUT_EVENT_MODULE_CHANGED );
+}
+
+void input_SendEventModuleChanged_AudioDecoder( input_thread_t *p_input, const char *p_decoder )
+{
+    var_SetString( p_input, "module-audio-decoder", p_decoder );
+    Trigger( p_input, INPUT_EVENT_MODULE_CHANGED );
+}
+
+void input_SendEventModuleChanged_VideoDecoderImpl( input_thread_t *p_input, const char *p_decoder_impl )
+{
+    var_SetString( p_input, "module-video-decoder-impl", p_decoder_impl );
+    Trigger( p_input, INPUT_EVENT_MODULE_CHANGED );
+}
+
+void input_SendEventModuleChanged_AudioDecoderImpl( input_thread_t *p_input, const char *p_decoder_impl )
+{
+    var_SetString( p_input, "module-audio-decoder-impl", p_decoder_impl );
+    Trigger( p_input, INPUT_EVENT_MODULE_CHANGED );
+}
+
 /* FIXME: review them because vlc_event_send might be
  * moved inside input_item* functions.
  */

@@ -103,6 +103,7 @@ enum libvlc_event_e {
     libvlc_VlmMediaInstanceStatusError,
 
     libvlc_MediaPlayerBufferingTotal=0x700,
+    libvlc_MediaPlayerModuleChanged=0x701,
 };
 
 /**
@@ -173,6 +174,13 @@ typedef struct libvlc_event_t
         {
             float new_cache_total;
         } media_player_buffering_total;
+        struct
+        {
+            const char * psz_video_decoder;
+            const char * psz_audio_decoder;
+            const char * psz_video_decoder_impl;
+            const char * psz_audio_decoder_impl;
+        } media_player_module_changed;
 
         /* media list */
         struct

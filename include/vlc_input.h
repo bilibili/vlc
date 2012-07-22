@@ -403,6 +403,9 @@ typedef enum input_event_type_e
     /* "cache-total" has changed */
     INPUT_EVENT_CACHE_TOTAL,
 
+    /* module changed */
+    INPUT_EVENT_MODULE_CHANGED,
+
 } input_event_type_e;
 
 /**

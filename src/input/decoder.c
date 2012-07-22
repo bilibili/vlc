@@ -287,6 +287,25 @@ static decoder_t *decoder_New( vlc_object_t *p_parent, input_thread_t *p_input,
         return NULL;
     }
 
+    if( p_dec->fmt_out.i_cat == AUDIO_ES )
+    {
+        const char *p_decoder = module_get_object( p_dec->p_module );
+        input_SendEventModuleChanged_AudioDecoder( p_input, p_decoder );
+
+        const char *p_decoder_impl = var_GetString( p_dec, "module-audio-decoder-impl" );
+        if( p_decoder_impl )
+            input_SendEventModuleChanged_AudioDecoderImpl( p_input, p_decoder_impl );
+    }
+    else
+    {
+        const char *p_decoder = module_get_object( p_dec->p_module );
+        input_SendEventModuleChanged_VideoDecoder( p_input, p_decoder );
+
+        const char *p_decoder_impl = var_GetString( p_dec, "module-video-decoder-impl" );
+        if( p_decoder_impl )
+            input_SendEventModuleChanged_VideoDecoderImpl( p_input, p_decoder_impl );
+    }
+
     p_dec->p_owner->p_clock = p_clock;
     assert( p_dec->fmt_out.i_cat != UNKNOWN_ES );
 
@@ -748,6 +767,9 @@ static decoder_t * CreateDecoder( vlc_object_t *p_parent,
     p_dec = vlc_custom_create( p_parent, sizeof( *p_dec ), "decoder" );
     if( p_dec == NULL )
         return NULL;
+
+    var_Create( p_dec, "module-audio-decoder-impl", VLC_VAR_STRING );
+    var_Create( p_dec, "module-video-decoder-impl", VLC_VAR_STRING );
 
     p_dec->pf_decode_audio = NULL;
     p_dec->pf_decode_video = NULL;
