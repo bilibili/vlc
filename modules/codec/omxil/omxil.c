@@ -1123,6 +1123,11 @@ static int OpenGeneric( vlc_object_t *p_this, bool b_encode )
     if (p_sys->b_use_pts)
         msg_Dbg( p_dec, "using pts timestamp mode for %s", p_sys->psz_component);
 
+    if( p_dec->fmt_in.i_cat != VIDEO_ES )
+        var_SetString( p_dec, "module-audio-decoder-impl", p_sys->psz_component );
+    else
+        var_SetString( p_dec, "module-video-decoder-impl", p_sys->psz_component );
+
     return VLC_SUCCESS;
 
  error:
