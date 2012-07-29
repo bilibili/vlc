@@ -1845,7 +1845,14 @@ static int hls_Download(stream_t *s, segment_t *segment)
         vlc_cond_wait(&p_sys->wait, &p_sys->lock);
     vlc_mutex_unlock(&p_sys->lock);
 
-    stream_t *p_ts = stream_UrlNew(s, segment->url);
+    stream_t *p_ts = NULL;
+    for( int i = 0; i < 3; ++i )
+    {
+        /* retry or may stalling */
+        p_ts = stream_UrlNew(s, segment->url);
+        if( p_ts )
+            break;
+    }
     if (p_ts == NULL)
         return VLC_EGENERIC;
 
