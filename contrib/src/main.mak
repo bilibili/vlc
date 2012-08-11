@@ -250,6 +250,7 @@ endif
 HOSTTOOLS := \
 	CC="$(CC)" CXX="$(CXX)" LD="$(LD)" \
 	AR="$(AR)" RANLIB="$(RANLIB)" STRIP="$(STRIP)" \
+	CHOST="$(CHOST)" \
 	PATH="$(PREFIX)/bin:$(PATH)"
 HOSTVARS := $(HOSTTOOLS) \
 	CPPFLAGS="$(CPPFLAGS)" \
