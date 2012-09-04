@@ -77,6 +77,7 @@ vlc_module_end ()
 
 #define BUFFER_BLOCK_SIZE ( 4 * 1024 * 1024 )
 #define BYTES_PER_READ ( 16 * 1024 )
+#define SHORT_SEEK_RANGE ( 64 * 1024 )
 
 typedef struct {
     uint8_t    *p_buffer;       /* allocated data */
@@ -100,7 +101,6 @@ struct stream_sys_t
     bool        b_can_seek;
     bool        b_error;        /* should return error from Read/Peek/Control */
     bool        b_close;        /* should exit prebuffer thread */
-    bool        b_buffered_eos; /* buffered to the end */
 
     vlc_mutex_t wait_fill_lock;
     vlc_cond_t  wait_fill;
@@ -115,11 +115,17 @@ struct stream_sys_t
      *
      *  If stream is seeked into or back over unbuffered data,
      *  i_prebuffer_offset should be recaculated immediately.
+     *
+     *  i_prebuffer_offset > source_lock > buffer_block_t.range_lock
+     *
      */
     vlc_mutex_t source_lock;        /* lock stream->p_source */
     vlc_array_t block_array;        /* all blocks, elements can be NULL, if not fetched */
     volatile uint64_t i_stream_offset;
+
+    vlc_mutex_t prebuffer_offset_lock;      /* lock i_prebuffer_offset, b_buffered_eos */
     volatile uint64_t i_prebuffer_offset;   /* first unbuffered byte after i_stream_offset */
+    volatile bool     b_buffered_eos;       /* buffered to the end */
 
     vlc_thread_t prebuffer_thread;
 
@@ -288,6 +294,7 @@ static stream_sys_t *sys_Alloc( void )
     memset( p_sys, 0, sizeof(stream_sys_t) );
 
     vlc_mutex_init( &p_sys->source_lock );
+    vlc_mutex_init( &p_sys->prebuffer_offset_lock );
 
     vlc_mutex_init( &p_sys->wait_fill_lock );
     vlc_cond_init( &p_sys->wait_fill );
@@ -318,6 +325,7 @@ static void sys_Free( stream_sys_t* p_sys )
         }
 
         vlc_mutex_destroy( &p_sys->source_lock );
+        vlc_mutex_destroy( &p_sys->prebuffer_offset_lock );
 
         vlc_mutex_destroy( &p_sys->wait_fill_lock );
         vlc_cond_destroy( &p_sys->wait_fill );
@@ -375,8 +383,8 @@ static uint64_t safe_GetPrebufferOffset( stream_t *p_stream )
     stream_sys_t *p_sys = p_stream->p_sys;
     uint64_t i_prebuffer_offset = 0;
 
-    vlc_mutex_lock( &p_sys->source_lock );
-    mutex_cleanup_push( &p_sys->source_lock );
+    vlc_mutex_lock( &p_sys->prebuffer_offset_lock );
+    mutex_cleanup_push( &p_sys->prebuffer_offset_lock );
 
     i_prebuffer_offset = p_sys->i_prebuffer_offset;
 
@@ -407,27 +415,24 @@ static void* PrebufferThread(void *p_this)
 
 
             /* Mark as EOS, and wake up any waiting Read/Peek */
-            vlc_mutex_lock( &p_sys->source_lock );
-            mutex_cleanup_push( &p_sys->source_lock );
-
+            vlc_mutex_lock( &p_sys->prebuffer_offset_lock );
+            mutex_cleanup_push( &p_sys->prebuffer_offset_lock );
             p_sys->b_buffered_eos = true;
+            vlc_cleanup_run( );
 
             vlc_mutex_lock( &p_sys->wait_fill_lock );
             mutex_cleanup_push( &p_sys->wait_fill_lock );
             vlc_cond_signal( &p_sys->wait_fill );
             vlc_cleanup_run( );
 
-            vlc_cleanup_run( );
-
-
             /* Wait for seek or exit */
             vlc_mutex_lock( &p_sys->wait_rewind_lock );
             mutex_cleanup_push( &p_sys->wait_rewind_lock );
-
             vlc_cond_wait( &p_sys->wait_rewind, &p_sys->wait_rewind_lock );
-            i_prebuffer_offset = p_sys->i_prebuffer_offset;
-
             vlc_cleanup_run( );
+
+            /* get latest prebuffer offset */
+            i_prebuffer_offset = safe_GetPrebufferOffset( p_stream );
         }
 
         /**
@@ -438,8 +443,8 @@ static void* PrebufferThread(void *p_this)
         int i_block_offset = i_prebuffer_offset % BUFFER_BLOCK_SIZE;
         buffer_block_t *p_block = NULL;
         {
-            vlc_mutex_lock( &p_sys->source_lock );
-            mutex_cleanup_push( &p_sys->source_lock );
+            vlc_mutex_lock( &p_sys->prebuffer_offset_lock );
+            mutex_cleanup_push( &p_sys->prebuffer_offset_lock );
 
             /* grow array if need */
             // msg_VVV( p_stream, "grow array if need" );
@@ -524,7 +529,7 @@ static void* PrebufferThread(void *p_this)
                 vlc_cleanup_run( ); /* block_lock */
 
             } /* end if( p_block ) */
-            vlc_cleanup_run( ); /* source_lock */
+            vlc_cleanup_run( ); /* prebuffer_offset_lock */
 
             if( p_sys->b_error || p_sys->b_close )
                 goto EXIT_THREAD;
@@ -545,25 +550,38 @@ static void* PrebufferThread(void *p_this)
             /* write on unbuffered area, no need to lock block */
             int i_read_ret = 0;
             bool b_need_rewind = false;
-            vlc_mutex_lock( &p_sys->source_lock );
-            mutex_cleanup_push( &p_sys->source_lock );
 
-            if( i_prebuffer_offset == p_sys->i_prebuffer_offset )
+            uint64_t i_latest_prebuffer_offset = safe_GetPrebufferOffset( p_stream );
+            if( i_prebuffer_offset == i_latest_prebuffer_offset )
             {
-                uint64_t i_source_offset = stream_Tell( p_stream->p_source );
-                if( i_prebuffer_offset != i_source_offset )
+                /*
+                 * p_sys->i_prebuffer_offset could be changed while we are reading from source stream.
+                 * it will be checked again after reading finished.
+                 */
                 {
-                    msg_Err( p_stream, "membuf: wrong prebuffer offset, expected: %"PRId64", actual: %"PRId64,
-                             i_prebuffer_offset,
-                             i_source_offset );
+                    vlc_mutex_lock( &p_sys->source_lock );
+                    mutex_cleanup_push( &p_sys->source_lock );
+
+                    uint64_t i_source_offset = stream_Tell( p_stream->p_source );
+                    if( i_prebuffer_offset == i_source_offset )
+                    {
+                        i_read_ret = stream_Read( p_stream->p_source,
+                                                  p_block->p_buffer + i_block_offset,
+                                                  i_step_read );
+                    }
+                    else
+                    {
+                        msg_Err( p_stream, "membuf: wrong prebuffer offset, expected: %"PRId64", actual: %"PRId64,
+                                 i_prebuffer_offset,
+                                 i_source_offset );
+                        b_need_rewind = true;
+                    }
+
+                    vlc_cleanup_run( );
                 }
 
-                i_read_ret = stream_Read( p_stream->p_source,
-                                         p_block->p_buffer + i_block_offset,
-                                         i_step_read );
-
                 /*
-                msg_VVV( p_stream, "PrebufferThread: stream_Read %lld at block[%d][%d]+%d (%d read)",
+                msg_VVV( p_stream, "PrebufferThread: stream_Read %"PRId64" at block[%d][%d]+%d (%d read)",
                         p_sys->i_prebuffer_offset,
                         i_block_index,
                         i_block_offset,
@@ -573,6 +591,9 @@ static void* PrebufferThread(void *p_this)
 
                 if( i_read_ret > 0 )
                 {
+                    vlc_mutex_lock( &p_sys->prebuffer_offset_lock );
+                    mutex_cleanup_push( &p_sys->prebuffer_offset_lock );
+
                     /* move block cursor */
                     vlc_mutex_lock( &p_block->range_lock );
                     mutex_cleanup_push( &p_block->range_lock );
@@ -581,18 +602,28 @@ static void* PrebufferThread(void *p_this)
                     p_block->i_data_end += i_read_ret;
                     assert( p_block->i_data_end <= p_block->i_block_size );
 
-                    vlc_cleanup_run( );
+                    vlc_cleanup_run( ); /* block lock */
 
-                    i_prebuffer_offset += i_read_ret;
-                    p_sys->i_prebuffer_offset += i_read_ret;
+                    uint64_t i_latest_prebuffer_offset = p_sys->i_prebuffer_offset;
+                    if( i_prebuffer_offset == i_latest_prebuffer_offset )
+                    {
+                        i_prebuffer_offset += i_read_ret;
+                        p_sys->i_prebuffer_offset = i_prebuffer_offset;
+                    }
+                    else
+                    {
+                        b_need_rewind = true;
+                        msg_Err( p_stream, "membuf: prebuffer offset was changed while we are reading" );
+                    }
+
+                    vlc_cleanup_run( ); /* prebuffer offset lock */
                 }
             }
             else
             {
                 b_need_rewind = true;
+                msg_Err( p_stream, "membuf: prebuffer offset was changed while we are looking for block" );
             }
-
-            vlc_cleanup_run( );
 
             if( b_need_rewind )
             {
@@ -691,8 +722,8 @@ static int safe_WaitFillData( stream_t *p_stream, unsigned int i_read )
     /* two-step volatile access */
     if( p_sys->b_buffered_eos )
     {
-        vlc_mutex_lock( &p_sys->source_lock );
-        mutex_cleanup_push( &p_sys->source_lock );
+        vlc_mutex_lock( &p_sys->prebuffer_offset_lock );
+        mutex_cleanup_push( &p_sys->prebuffer_offset_lock );
         if( p_sys->b_buffered_eos )
         {
             if( p_sys->i_stream_offset >= p_sys->i_prebuffer_offset )
@@ -712,13 +743,16 @@ static int safe_WaitFillData( stream_t *p_stream, unsigned int i_read )
     if( i_read == 0 )
         return i_read;
 
-    if( p_sys->i_stream_offset + i_read <= p_sys->i_prebuffer_offset )
+    /* p_sys->i_prebuffer_offset can be increased only in prebuffer thread */
+    /* so, it's safe to rely on it */
+    uint64_t i_prebuffer_offset = safe_GetPrebufferOffset( p_stream );
+    if( p_sys->i_stream_offset + i_read <= i_prebuffer_offset )
         return i_read;
 
     msg_Warn( p_stream, "membuf: wait fill data %d", i_read );
 
     /* p_sys->i_prebuffer_offset may forward, so get a snapshot here */
-    while( p_sys->i_stream_offset + i_read > p_sys->i_prebuffer_offset )
+    while( p_sys->i_stream_offset + i_read > i_prebuffer_offset )
     {
         if( p_sys->b_error || p_sys->b_close )
             break;
@@ -740,11 +774,13 @@ static int safe_WaitFillData( stream_t *p_stream, unsigned int i_read )
         vlc_cond_wait( &p_sys->wait_fill, &p_sys->wait_fill_lock );
 
         vlc_cleanup_run( );
+
+        i_prebuffer_offset = safe_GetPrebufferOffset( p_stream );
     }
 
-    msg_Warn( p_stream, "membuf: wait fill data end %lld, %lld",
+    msg_Warn( p_stream, "membuf: wait fill data end %"PRId64", %"PRId64,
              p_sys->i_stream_offset,
-             p_sys->i_prebuffer_offset);
+             i_prebuffer_offset );
 
     if( p_sys->b_error || p_sys->b_close )
         return -1;
@@ -754,10 +790,10 @@ static int safe_WaitFillData( stream_t *p_stream, unsigned int i_read )
 
 static int Read( stream_t *p_stream, void *p_buffer, unsigned int i_read )
 {
-    // msg_VVV( p_stream, "membuf:Peek %lld, %d", stream_Tell( p_stream->p_source ), i_read );
+    // msg_VVV( p_stream, "membuf:Peek %"PRId64", %d", stream_Tell( p_stream->p_source ), i_read );
     // return stream_Read( p_stream->p_source, p_buffer, i_read );
     stream_sys_t *p_sys = p_stream->p_sys;
-    // msg_VVV( p_stream, "membuf:Read %lld, %d", p_sys->i_stream_offset, i_read );
+    // msg_VVV( p_stream, "membuf:Read %"PRId64", %d", p_sys->i_stream_offset, i_read );
 
     assert( p_stream->p_source );
 
@@ -787,10 +823,10 @@ static int Read( stream_t *p_stream, void *p_buffer, unsigned int i_read )
 
 static int Peek( stream_t *p_stream, const uint8_t **pp_peek, unsigned int i_peek )
 {
-    // msg_VVV( p_stream, "membuf:Peek %lld, %d", stream_Tell( p_stream->p_source ), i_peek );
+    // msg_VVV( p_stream, "membuf:Peek %"PRId64", %d", stream_Tell( p_stream->p_source ), i_peek );
     // return stream_Peek( p_stream->p_source, pp_peek, i_peek );
     stream_sys_t *p_sys = p_stream->p_sys;
-    // msg_VVV( p_stream, "membuf:Peek %lld, %d", p_sys->i_stream_offset, i_peek );
+    // msg_VVV( p_stream, "membuf:Peek %"PRId64", %d", p_sys->i_stream_offset, i_peek );
 
     assert( p_stream->p_source );
 
@@ -868,20 +904,38 @@ static int Control( stream_t *p_stream, int i_query, va_list args )
 
             int i_seek_ret = VLC_EGENERIC;
             uint64_t i_seek_pos = (va_arg (args, uint64_t));
-            msg_VVV( p_stream, "membuf: seek to %lld", i_seek_pos );
+            msg_VVV( p_stream, "membuf: seek to %"PRId64, i_seek_pos );
 
-            /* try to be cancellation-safe */
-            vlc_mutex_lock( &p_sys->source_lock );
-            mutex_cleanup_push( &p_sys->source_lock );
+            /* short seek */
+            {
+                uint64_t i_prebuffer_offset = safe_GetPrebufferOffset( p_stream );
+                uint64_t i_stream_offset = p_sys->i_stream_offset;
+                if( i_seek_pos > i_prebuffer_offset && i_seek_pos < i_prebuffer_offset + SHORT_SEEK_RANGE)
+                {
+                    msg_VVV( p_stream, "membuf: short seek out of buffered range ~%"PRId64" (expected %"PRId64")",
+                            i_prebuffer_offset,
+                            i_seek_pos );
+
+                    int i_read = i_seek_pos - i_stream_offset;
+                    int i_ready_data = safe_WaitFillData( p_stream, i_read );
+                    if( i_ready_data <= 0 )
+                    {
+                        msg_Warn( p_stream, "membuf: Read() interrupted or eos" );
+                        return i_ready_data;
+                    }
+                }
+            }
+
+            vlc_mutex_lock( &p_sys->prebuffer_offset_lock );
+            mutex_cleanup_push( &p_sys->prebuffer_offset_lock );
 
             uint64_t i_prebuffer_rewind_pos = unsafe_FindRewindBufferedPosition( p_stream, i_seek_pos );
 
             /* check current position */
-            uint64_t i_rewind_offset = 0;
             if( i_seek_pos <= p_sys->i_prebuffer_offset &&
                 i_seek_pos < i_prebuffer_rewind_pos )
             {
-                msg_VVV( p_stream, "membuf: seek within buffered range ~%lld (expected %lld)",
+                msg_VVV( p_stream, "membuf: seek within buffered range ~%"PRId64" (expected %"PRId64")",
                         i_prebuffer_rewind_pos,
                         p_sys->i_prebuffer_offset );
 
@@ -890,12 +944,19 @@ static int Control( stream_t *p_stream, int i_query, va_list args )
             }
             else
             {
-                msg_VVV( p_stream, "membuf: seek out of buffered range, rewind to %lld", i_prebuffer_rewind_pos );
+                uint64_t i_rewind_offset = 0;
+                /* seek does not occur too often, just lock all we need to make life easy */
+                vlc_mutex_lock( &p_sys->source_lock );
+                mutex_cleanup_push( &p_sys->source_lock );
+
+                msg_VVV( p_stream, "membuf: seek out of buffered range, rewind to %"PRId64, i_prebuffer_rewind_pos );
                 i_seek_ret = stream_Seek( p_stream->p_source, i_prebuffer_rewind_pos );
 
                 /* no matter fail or success, we rely on stream_Tell() */
                 i_rewind_offset = stream_Tell( p_stream->p_source );
-                msg_VVV( p_stream, "membuf: seek rewind end at %lld", i_rewind_offset );
+                msg_VVV( p_stream, "membuf: seek rewind end at %"PRId64, i_rewind_offset );
+
+                vlc_cleanup_run( ); /* source lock */
 
                 p_sys->b_buffered_eos = false;
                 p_sys->i_prebuffer_offset = i_rewind_offset;
@@ -913,7 +974,7 @@ static int Control( stream_t *p_stream, int i_query, va_list args )
                 }
             }
 
-            vlc_cleanup_run( );
+            vlc_cleanup_run( ); /* prebuffer offset lock */
 
             /* wakeup prebuffer thread */
             vlc_mutex_lock( &p_sys->wait_rewind_lock );
