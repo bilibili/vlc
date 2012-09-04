@@ -1831,6 +1831,17 @@ LIBVLC_API int libvlc_media_player_set_equalizer( libvlc_media_player_t *p_mi, l
 
 /** @} audio */
 
+LIBVLC_API void libvlc_media_player_set_vsl_callback(
+        libvlc_media_player_t *p_mi,
+        void *p_cb_data,
+        libvlc_vsl_load_cb p_load_cb,
+        libvlc_vsl_load_segment_cb p_load_segment_cb,
+        libvlc_vsl_get_count_cb p_get_count_cb,
+        libvlc_vsl_get_mrl_cb p_get_mrl_cb,
+        libvlc_vsl_get_url_cb p_get_url_cb,
+        libvlc_vsl_get_duration_cb p_get_duration_cb,
+        libvlc_vsl_get_bytes_cb p_get_bytes_cb );
+
 /** @} media_player */
 
 # ifdef __cplusplus
