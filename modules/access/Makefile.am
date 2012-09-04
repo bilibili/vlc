@@ -288,6 +288,18 @@ access_LTLIBRARIES += libaccess_bd_plugin.la
 endif
 
 
+libaccess_vslindex_plugin_la_SOURCES = access/vsl/index.c access/vsl/vsl.c access/vsl/vsl.h
+libaccess_vslindex_plugin_la_CFLAGS = $(AM_CFLAGS)
+libaccess_vslindex_plugin_la_LIBADD = $(SOCKET_LIBS)
+libaccess_vslindex_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(accessdir)'
+access_LTLIBRARIES += libaccess_vslindex_plugin.la
+
+libaccess_vslsegment_plugin_la_SOURCES = access/vsl/segment.c
+libaccess_vslsegment_plugin_la_CFLAGS = $(AM_CFLAGS)
+libaccess_vslsegment_plugin_la_LIBADD = $(SOCKET_LIBS)
+libaccess_vslsegment_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(accessdir)'
+access_LTLIBRARIES += libaccess_vslsegment_plugin.la
+
 ### Digital TV ###
 
 libdtv_plugin_la_SOURCES = \
