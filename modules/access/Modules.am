@@ -234,6 +234,18 @@ libvlc_LTLIBRARIES += libaccess_bd_plugin.la
 endif
 
 
+libaccess_vslindex_plugin_la_SOURCES = vsl/index.c vsl/vsl.c
+libaccess_vslindex_plugin_la_CFLAGS = $(AM_CFLAGS)
+libaccess_vslindex_plugin_la_LIBADD = $(AM_LIBADD)
+libaccess_vslindex_plugin_la_DEPENDENCIES =
+libvlc_LTLIBRARIES += libaccess_vslindex_plugin.la
+
+libaccess_vslsegment_plugin_la_SOURCES = vsl/segment.c
+libaccess_vslsegment_plugin_la_CFLAGS = $(AM_CFLAGS)
+libaccess_vslsegment_plugin_la_LIBADD = $(AM_LIBADD)
+libaccess_vslsegment_plugin_la_DEPENDENCIES =
+libvlc_LTLIBRARIES += libaccess_vslsegment_plugin.la
+
 ### Digital TV ###
 
 libdtv_plugin_la_SOURCES = \
