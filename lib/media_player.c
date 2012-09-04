@@ -473,6 +473,15 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     var_Create (mp, "amem-rate", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
     var_Create (mp, "amem-channels", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
 
+    var_Create (mp, "vsl-data", VLC_VAR_ADDRESS);
+    var_Create (mp, "vsl-load", VLC_VAR_ADDRESS);
+    var_Create (mp, "vsl-load-segment", VLC_VAR_ADDRESS);
+    var_Create (mp, "vsl-get-count", VLC_VAR_ADDRESS);
+    var_Create (mp, "vsl-get-mrl", VLC_VAR_ADDRESS);
+    var_Create (mp, "vsl-get-url", VLC_VAR_ADDRESS);
+    var_Create (mp, "vsl-get-duration", VLC_VAR_ADDRESS);
+    var_Create (mp, "vsl-get-bytes", VLC_VAR_ADDRESS);
+
     mp->p_md = NULL;
     mp->state = libvlc_NothingSpecial;
     mp->p_libvlc_instance = instance;
@@ -1403,4 +1412,25 @@ void libvlc_media_player_next_frame( libvlc_media_player_t *p_mi )
         var_TriggerCallback( p_input_thread, "frame-next" );
         vlc_object_release( p_input_thread );
     }
+}
+
+void libvlc_media_player_set_vsl_callback(
+    libvlc_media_player_t *p_mi,
+    void *p_cb_data,
+    libvlc_vsl_load_cb p_load_cb,
+    libvlc_vsl_load_segment_cb p_load_segment_cb,
+    libvlc_vsl_get_count_cb p_get_count_cb,
+    libvlc_vsl_get_mrl_cb p_get_mrl_cb,
+    libvlc_vsl_get_url_cb p_get_url_cb,
+    libvlc_vsl_get_duration_cb p_get_duration_cb,
+    libvlc_vsl_get_bytes_cb p_get_bytes_cb )
+{
+    var_SetAddress( p_mi, "vsl-data", p_cb_data );
+    var_SetAddress( p_mi, "vsl-load", p_load_cb );
+    var_SetAddress( p_mi, "vsl-load-segment", p_load_segment_cb );
+    var_SetAddress( p_mi, "vsl-get-count", p_get_count_cb );
+    var_SetAddress( p_mi, "vsl-get-mrl", p_get_mrl_cb );
+    var_SetAddress( p_mi, "vsl-get-url", p_get_url_cb );
+    var_SetAddress( p_mi, "vsl-get-duration", p_get_duration_cb );
+    var_SetAddress( p_mi, "vsl-get-bytes", p_get_bytes_cb );
 }

@@ -30,6 +30,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 
 # ifdef __cplusplus
 extern "C" {
@@ -63,6 +64,15 @@ typedef struct libvlc_log_message_t
     const char *psz_header;   /* optional header */
     const char *psz_message;  /* message */
 } libvlc_log_message_t;
+
+/* returned string need free() */
+typedef int     (*libvlc_vsl_load_cb)( void *p_cb_data, bool b_force_reload );
+typedef int     (*libvlc_vsl_load_segment_cb)( void *p_cb_data, bool b_force_reload, int segment );
+typedef int     (*libvlc_vsl_get_count_cb)( void *p_cb_data );
+typedef char   *(*libvlc_vsl_get_mrl_cb)( void *p_cb_data, int i_order );
+typedef char   *(*libvlc_vsl_get_url_cb)( void *p_cb_data, int i_order );
+typedef int     (*libvlc_vsl_get_duration_cb)( void *p_cb_data, int i_order );
+typedef int64_t (*libvlc_vsl_get_bytes_cb)( void *p_cb_data, int i_order );
 
 /**@} */
 
