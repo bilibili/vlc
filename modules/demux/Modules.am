@@ -93,8 +93,10 @@ endif
 if HAVE_DARWIN
 libmkv_plugin_la_LDFLAGS += -Wl,-framework,IOKit,-framework,CoreFoundation
 endif
+if !MODULE_LITE
 libvlc_LTLIBRARIES += $(LTLIBmkv)
 EXTRA_LTLIBRARIES += libmkv_plugin.la
+endif
 
 libmp4_plugin_la_SOURCES = mp4/mp4.c mp4/libmp4.c mp4/libmp4.h mp4/id3genres.h
 libmp4_plugin_la_CFLAGS = $(AM_CFLAGS)
@@ -142,9 +144,7 @@ endif
 
 libvlc_LTLIBRARIES += \
 	libaiff_plugin.la \
-	libasf_plugin.la \
 	libau_plugin.la \
-	libavi_plugin.la \
 	librawaud_plugin.la \
 	libdirac_plugin.la \
 	libdemux_cdg_plugin.la \
@@ -158,7 +158,6 @@ libvlc_LTLIBRARIES += \
 	libnsc_plugin.la \
 	libnsv_plugin.la \
 	libnuv_plugin.la \
-	libplaylist_plugin.la \
 	libpva_plugin.la \
 	libps_plugin.la \
 	librawdv_plugin.la \
@@ -176,6 +175,14 @@ libvlc_LTLIBRARIES += \
 	libimage_plugin.la \
 	libdemux_stl_plugin.la \
 	$(NULL)
+
+if !MODULE_LITE
+libvlc_LTLIBRARIES += \
+	libasf_plugin.la \
+	libavi_plugin.la \
+	libplaylist_plugin.la \
+	$(NULL)
+endif
 
 BUILT_SOURCES += dummy.cpp
 

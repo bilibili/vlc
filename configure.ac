@@ -280,6 +280,7 @@ AM_CONDITIONAL(HAVE_OS2,     test "${SYS}" = "os2")
 AM_CONDITIONAL(HAVE_WIN32,   test "${SYS}" = "mingw32")
 AM_CONDITIONAL(HAVE_WIN64,   test "${HAVE_WIN64}" = "1")
 AM_CONDITIONAL(HAVE_SYMBIAN, test "${SYS}" = "symbian")
+AM_CONDITIONAL(MODULE_LITE,  test "${MODULE_LITE}" = "1")
 
 dnl
 dnl Sadly autoconf does not think about testing foo.exe when ask to test
@@ -4182,7 +4183,6 @@ AC_CONFIG_FILES([
   bin/Makefile
   test/Makefile
   modules/access/Makefile
-  modules/access/rtp/Makefile
   modules/access_output/Makefile
   modules/audio_filter/Makefile
   modules/audio_mixer/Makefile

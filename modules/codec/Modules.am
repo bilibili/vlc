@@ -75,7 +75,6 @@ libvlc_LTLIBRARIES += \
 	liblpcm_plugin.la \
 	libmpeg_audio_plugin.la \
 	librawvideo_plugin.la \
-	libspudec_plugin.la \
 	libsvcdsub_plugin.la \
 	libsubsdec_plugin.la \
 	libsubsusf_plugin.la \
@@ -87,6 +86,12 @@ if ENABLE_SOUT
 libvlc_LTLIBRARIES += \
 	libt140_plugin.la \
 	libedummy_plugin.la
+endif
+
+if !MODULE_LITE
+libvlc_LTLIBRARIES += \
+	libspudec_plugin.la \
+	$(NULL)
 endif
 
 ### FFmpeg/libav ###
