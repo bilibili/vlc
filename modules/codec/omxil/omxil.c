@@ -1462,7 +1462,7 @@ more_input:
         p_header->nFilledLen = p_block->i_buffer - i_input_used;
         p_header->nOffset = 0;
         p_header->nFlags = OMX_BUFFERFLAG_ENDOFFRAME;
-        if (p_sys->b_use_pts && p_block->i_pts)
+        if (p_sys->b_use_pts)
             p_header->nTimeStamp = ToOmxTicks(p_block->i_pts);
         else
             p_header->nTimeStamp = ToOmxTicks(p_block->i_dts);
