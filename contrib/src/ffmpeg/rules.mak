@@ -2,11 +2,11 @@
 
 #Uncomment the one you want
 #USE_LIBAV ?= 1
-#USE_FFMPEG ?= 1
+USE_FFMPEG ?= 1
 
 ifdef USE_FFMPEG
-HASH=HEAD
-FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(HASH);sf=tgz
+HASH=ijk-r0.0.6-dev
+FFMPEG_SNAPURL := https://github.com/bbcallen/FFmpeg/archive/$(HASH).tar.gz
 else
 HASH=HEAD
 FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(HASH);sf=tgz
