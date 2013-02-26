@@ -1,6 +1,6 @@
 # FFmpeg
 
-HASH=HEAD
+HASH=v9.8
 
 #FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(HASH);sf=tgz
 FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(HASH);sf=tgz
