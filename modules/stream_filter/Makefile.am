@@ -113,5 +113,17 @@ if HAVE_GCRYPT
 stream_filter_LTLIBRARIES += libhttplive_plugin.la
 endif
 
+libstream_filter_ringbuf_plugin_la_SOURCES = stream_filter/ringbuf.c
+libstream_filter_ringbuf_plugin_la_CFLAGS = $(AM_CFLAGS)
+libstream_filter_ringbuf_plugin_la_LIBADD = $(AM_LIBADD)
+libstream_filter_ringbuf_plugin_la_DEPENDENCIES =
+stream_filter_LTLIBRARIES += libstream_filter_ringbuf_plugin.la
+
+libstream_filter_membuf_plugin_la_SOURCES = stream_filter/membuf.c
+libstream_filter_membuf_plugin_la_CFLAGS = $(AM_CFLAGS)
+libstream_filter_membuf_plugin_la_LIBADD = $(AM_LIBADD)
+libstream_filter_membuf_plugin_la_DEPENDENCIES =
+stream_filter_LTLIBRARIES += libstream_filter_membuf_plugin.la
+
 librecord_plugin_la_SOURCES = stream_filter/record.c
 stream_filter_LTLIBRARIES += librecord_plugin.la
