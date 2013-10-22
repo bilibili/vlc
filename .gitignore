@@ -52,3 +52,8 @@ build-*
 contrib-*
 install-*
 
+# custom
+contrib/android
+pt
+intl
+android
