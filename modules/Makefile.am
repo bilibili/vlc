@@ -34,7 +34,6 @@ dist_noinst_DATA = MODULES_LIST
 
 include common.am
 include access/Makefile.am
-include access/rtp/Makefile.am
 include arm_neon/Makefile.am
 include audio_mixer/Makefile.am
 include audio_output/Makefile.am

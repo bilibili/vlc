@@ -8,6 +8,7 @@ if !HAVE_WIN32
 stream_filter_LTLIBRARIES += libdecomp_plugin.la
 endif
 
+if !MODULE_LITE
 libdash_plugin_la_SOURCES = \
     stream_filter/dash/adaptationlogic/AbstractAdaptationLogic.cpp \
     stream_filter/dash/adaptationlogic/AbstractAdaptationLogic.h \
@@ -103,6 +104,7 @@ libsmooth_plugin_la_SOURCES = \
 
 libsmooth_plugin_la_CFLAGS = $(AM_CFLAGS)
 stream_filter_LTLIBRARIES += libsmooth_plugin.la
+endif
 
 libhttplive_plugin_la_SOURCES = stream_filter/httplive.c
 libhttplive_plugin_la_CFLAGS = $(AM_CFLAGS) $(GCRYPT_CFLAGS)

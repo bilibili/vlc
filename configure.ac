@@ -321,6 +321,7 @@ AS_IF([test "$SYS" = linux],[
     ])
 ])
 AM_CONDITIONAL(HAVE_ANDROID, test "${HAVE_ANDROID}" = "1")
+AM_CONDITIONAL(MODULE_LITE, test "${HAVE_MODULE_FULL}" != "1")
 
 
 dnl

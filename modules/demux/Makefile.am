@@ -120,11 +120,13 @@ libdemux_stl_plugin_la_SOURCES = demux/stl.c
 libdemux_stl_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
 demux_LTLIBRARIES += libdemux_stl_plugin.la
 
+if !MODULE_LITE
 libasf_plugin_la_SOURCES = demux/asf/asf.c demux/asf/libasf.c demux/asf/libasf.h demux/asf/libasf_guid.h
 demux_LTLIBRARIES += libasf_plugin.la
 
 libavi_plugin_la_SOURCES = demux/avi/avi.c demux/avi/libavi.c demux/avi/libavi.h
 demux_LTLIBRARIES += libavi_plugin.la
+endif
 
 libcaf_plugin_la_SOURCES = demux/caf.c
 libcaf_plugin_la_LIBADD = $(LIBM)
@@ -161,6 +163,7 @@ demux_LTLIBRARIES += libes_plugin.la
 libh264_plugin_la_SOURCES = demux/mpeg/h264.c
 demux_LTLIBRARIES += libh264_plugin.la
 
+if !MODULE_LITE
 libhevc_plugin_la_SOURCES = demux/mpeg/hevc.c demux/mpeg/mpeg_parser_helpers.h
 demux_LTLIBRARIES += libhevc_plugin.la
 
@@ -217,6 +220,7 @@ libplaylist_plugin_la_SOURCES = \
 	demux/playlist/zpl.c \
 	demux/playlist/playlist.c demux/playlist/playlist.h
 demux_LTLIBRARIES += libplaylist_plugin.la
+endif
 
 libts_plugin_la_SOURCES = demux/ts.c mux/mpeg/csa.c mux/mpeg/dvbpsi_compat.h demux/dvb-text.h
 libts_plugin_la_CFLAGS = $(AM_CFLAGS) $(DVBPSI_CFLAGS)

@@ -147,9 +147,11 @@ codec_LTLIBRARIES += libdvbsub_plugin.la
 libscte27_plugin_la_SOURCES = codec/scte27.c
 codec_LTLIBRARIES += libscte27_plugin.la
 
+if !MODULE_LITE
 libspudec_plugin_la_SOURCES = codec/spudec/spudec.c codec/spudec/parse.c codec/spudec/spudec.h
 libspudec_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
 codec_LTLIBRARIES += libspudec_plugin.la
+endif
 
 libstl_plugin_la_SOURCES = codec/stl.c
 codec_LTLIBRARIES += libstl_plugin.la

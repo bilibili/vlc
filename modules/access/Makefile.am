@@ -150,6 +150,7 @@ if HAVE_QTKIT
 access_LTLIBRARIES += libqtcapture_plugin.la
 endif
 
+if !MODULE_LITE
 libv4l2_plugin_la_SOURCES = \
 	access/v4l2/linux/videodev2.h \
 	access/v4l2/linux/v4l2-common.h \
@@ -284,6 +285,7 @@ EXTRA_LTLIBRARIES += liblibbluray_plugin.la
 
 libaccess_bd_plugin_la_SOURCES = access/bd/bd.c access/bd/mpls.c access/bd/mpls.h access/bd/clpi.c access/bd/clpi.h
 access_LTLIBRARIES += libaccess_bd_plugin.la
+endif
 
 
 ### Digital TV ###
