@@ -351,13 +351,21 @@ static int OpenDecoder(vlc_object_t *p_this)
             jobject name = (*env)->CallObjectMethod(env, info, p_sys->get_name);
             jsize name_len = (*env)->GetStringUTFLength(env, name);
             const char *name_ptr = (*env)->GetStringUTFChars(env, name, NULL);
-            msg_Dbg(p_dec, "using %.*s", name_len, name_ptr);
-            p_sys->name = malloc(name_len + 1);
-            memcpy(p_sys->name, name_ptr, name_len);
-            p_sys->name[name_len] = '\0';
-            (*env)->ReleaseStringUTFChars(env, name, name_ptr);
-            codec_name = name;
-            break;
+            if (name_len == 0 || name_ptr == NULL) {
+                msg_Dbg(p_dec, "invalid codec name %.*s", name_len, name_ptr);
+            } else if (0 == strncmp(name_ptr, "OMX.MTK.VIDEO.DECODER.AVC", name_len)) {
+                msg_Dbg(p_dec, "disable %.*s", name_len, name_ptr);
+                (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+                (*env)->DeleteLocalRef(env, name);
+            } else {
+                msg_Dbg(p_dec, "using %.*s", name_len, name_ptr);
+                p_sys->name = malloc(name_len + 1);
+                memcpy(p_sys->name, name_ptr, name_len);
+                p_sys->name[name_len] = '\0';
+                (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+                codec_name = name;
+                break;
+            }
         }
         (*env)->DeleteLocalRef(env, info);
     }
