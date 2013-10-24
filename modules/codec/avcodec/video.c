@@ -129,12 +129,14 @@ static inline picture_t *ffmpeg_NewPictBuf( decoder_t *p_dec,
     int width = p_context->coded_width;
     int height = p_context->coded_height;
 
+#ifndef __ANDROID__
     if( p_sys->p_va == NULL )
     {
         int aligns[AV_NUM_DATA_POINTERS];
 
         avcodec_align_dimensions2(p_context, &width, &height, aligns);
     }
+#endif
 
     if( width == 0 || height == 0)
         return NULL; /* invalid display size */
