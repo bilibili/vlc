@@ -74,6 +74,8 @@ static OMX_ERRORTYPE OmxEmptyBufferDone( OMX_HANDLETYPE, OMX_PTR,
 static OMX_ERRORTYPE OmxFillBufferDone( OMX_HANDLETYPE, OMX_PTR,
                                         OMX_BUFFERHEADERTYPE * );
 
+static vlc_mutex_t single_instance = VLC_STATIC_MUTEX;
+
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
@@ -1037,6 +1039,14 @@ static int OpenGeneric( vlc_object_t *p_this, bool b_encode )
         return VLC_ENOMEM;
     }
 
+    /* */
+    if (vlc_mutex_trylock(&single_instance) != 0) {
+        msg_Err(p_dec, "Can't start more than one instance at a time");
+        free(p_sys);
+        DeinitOmxCore();
+        return VLC_EGENERIC;
+    }
+
     /* Initialise the thread properties */
     if(!b_encode)
     {
@@ -1849,6 +1859,8 @@ static void CloseGeneric( vlc_object_t *p_this )
     vlc_cond_destroy (&p_sys->out.fifo.wait);
 
     free( p_sys );
+
+    vlc_mutex_unlock(&single_instance);
 }
 
 /*****************************************************************************
