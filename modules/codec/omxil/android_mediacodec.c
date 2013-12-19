@@ -179,6 +179,7 @@ static void CloseDecoder(vlc_object_t *);
 static picture_t *DecodeVideo(decoder_t *, block_t **);
 
 static void InvalidateAllPictures(decoder_t *);
+static vlc_mutex_t single_instance = VLC_STATIC_MUTEX;
 
 /*****************************************************************************
  * Module descriptor
@@ -241,6 +242,13 @@ static int OpenDecoder(vlc_object_t *p_this)
     /* Allocate the memory needed to store the decoder's structure */
     if ((p_dec->p_sys = p_sys = calloc(1, sizeof(*p_sys))) == NULL)
         return VLC_ENOMEM;
+
+    /* */
+    if (vlc_mutex_trylock(&single_instance) != 0) {
+        msg_Err(p_dec, "Can't start more than one instance at a time");
+        free(p_sys);
+        return VLC_ENOMEM;
+    }
 
     p_dec->pf_decode_video = DecodeVideo;
 
@@ -500,6 +508,8 @@ static void CloseDecoder(vlc_object_t *p_this)
     ArchitectureSpecificCopyHooksDestroy(p_sys->pixel_format, &p_sys->architecture_specific_data);
     free(p_sys->inflight_picture);
     free(p_sys);
+
+    vlc_mutex_unlock(&single_instance);
 }
 
 /*****************************************************************************
