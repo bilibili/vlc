@@ -212,6 +212,47 @@ static int jstrcmp(JNIEnv* env, jobject str, const char* str2)
     return ret;
 }
 
+static pthread_key_t g_thread_key;
+static pthread_once_t g_key_once = PTHREAD_ONCE_INIT;
+
+static void vlcjni_thread_destroy(void* value)
+{
+    JNIEnv *env = (JNIEnv*) value;
+    if (env != NULL) {
+        (*myVm)->DetachCurrentThread(myVm);
+        pthread_setspecific(g_thread_key, NULL);
+    }
+}
+
+static void vlcjni_make_thread_key()
+{
+    pthread_key_create(&g_thread_key, vlcjni_thread_destroy);
+}
+
+static jint vlcjni_setup_thread_env(JNIEnv **p_env)
+{
+    JavaVM *jvm = myVm;
+    if (!jvm)
+        return -1;
+
+    pthread_once(&g_key_once, vlcjni_make_thread_key);
+
+    JNIEnv *env = (JNIEnv*) pthread_getspecific(g_thread_key);
+    if (env) {
+        *p_env = env;
+        return 0;
+    }
+
+    static JavaVMAttachArgs vlc_thr_args = {JNI_VERSION_1_2, "MediaCodec", NULL};
+    if ((*jvm)->AttachCurrentThread(jvm, &env, &vlc_thr_args) == JNI_OK) {
+        pthread_setspecific(g_thread_key, env);
+        *p_env = env;
+        return 0;
+    }
+
+    return -1;
+}
+
 /*****************************************************************************
  * OpenDecoder: Create the decoder instance
  *****************************************************************************/
@@ -259,7 +300,7 @@ static int OpenDecoder(vlc_object_t *p_this)
     p_dec->b_need_packetized = true;
 
     JNIEnv* env = NULL;
-    (*myVm)->AttachCurrentThread(myVm, &env, NULL);
+    vlcjni_setup_thread_env(&env);
 
     for (int i = 0; classes[i].name; i++) {
         *(jclass*)((uint8_t*)p_sys + classes[i].offset) =
@@ -467,11 +508,9 @@ static int OpenDecoder(vlc_object_t *p_this)
         goto error;
     (*env)->DeleteLocalRef(env, format);
 
-    (*myVm)->DetachCurrentThread(myVm);
     return VLC_SUCCESS;
 
  error:
-    (*myVm)->DetachCurrentThread(myVm);
     CloseDecoder(p_this);
     return VLC_EGENERIC;
 }
@@ -489,7 +528,7 @@ static void CloseDecoder(vlc_object_t *p_this)
      * to prevent the vout from using destroyed output buffers. */
     if (p_sys->direct_rendering)
         InvalidateAllPictures(p_dec);
-    (*myVm)->AttachCurrentThread(myVm, &env, NULL);
+    vlcjni_setup_thread_env(&env);
     if (p_sys->input_buffers)
         (*env)->DeleteGlobalRef(env, p_sys->input_buffers);
     if (p_sys->output_buffers)
@@ -502,7 +541,6 @@ static void CloseDecoder(vlc_object_t *p_this)
     }
     if (p_sys->buffer_info)
         (*env)->DeleteGlobalRef(env, p_sys->buffer_info);
-    (*myVm)->DetachCurrentThread(myVm);
 
     free(p_sys->name);
     ArchitectureSpecificCopyHooksDestroy(p_sys->pixel_format, &p_sys->architecture_specific_data);
@@ -537,14 +575,13 @@ static void DisplayBuffer(picture_sys_t* p_picsys, bool b_render)
 
     /* Release the MediaCodec buffer. */
     JNIEnv *env = NULL;
-    (*myVm)->AttachCurrentThread(myVm, &env, NULL);
+    vlcjni_setup_thread_env(&env);
     (*env)->CallVoidMethod(env, p_sys->codec, p_sys->release_output_buffer, i_index, b_render);
     if ((*env)->ExceptionOccurred(env)) {
         msg_Err(p_dec, "Exception in MediaCodec.releaseOutputBuffer (DisplayBuffer)");
         (*env)->ExceptionClear(env);
     }
 
-    (*myVm)->DetachCurrentThread(myVm);
     p_picsys->b_valid = false;
 
     vlc_mutex_unlock(get_android_opaque_mutex());
@@ -759,7 +796,7 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
         return NULL;
     }
 
-    (*myVm)->AttachCurrentThread(myVm, &env, NULL);
+    vlcjni_setup_thread_env(&env);
 
     if (p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED)) {
         block_Release(p_block);
@@ -778,7 +815,6 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
             }
         }
         p_sys->decoded = false;
-        (*myVm)->DetachCurrentThread(myVm);
         return NULL;
     }
 
@@ -808,7 +844,6 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
                  * without assigning NULL to *pp_block. The next call
                  * to DecodeVideo will try to send the input packet again.
                  */
-                (*myVm)->DetachCurrentThread(myVm);
                 return p_pic;
             }
             timeout = 30*1000;
@@ -834,7 +869,6 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
                     block_Release(p_block);
                     *pp_block = NULL;
                 }
-                (*myVm)->DetachCurrentThread(myVm);
                 return invalid_picture;
             }
             continue;
@@ -858,7 +892,6 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
     }
     if (!p_pic)
         GetOutput(p_dec, env, &p_pic);
-    (*myVm)->DetachCurrentThread(myVm);
 
     block_Release(p_block);
     *pp_block = NULL;
