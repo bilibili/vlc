@@ -508,6 +508,15 @@ static int OpenDecoder(vlc_object_t *p_this)
         goto error;
     (*env)->DeleteLocalRef(env, format);
 
+    if (p_sys->direct_rendering) {
+        char *psz_tmp = NULL;
+        asprintf( &psz_tmp, "%s, SurfaceRender", p_sys->name );
+        var_SetString( p_dec, "module-video-decoder-impl", psz_tmp );
+        free( psz_tmp );
+    } else {
+        var_SetString( p_dec, "module-video-decoder-impl", p_sys->name );
+    }
+
     return VLC_SUCCESS;
 
  error:
