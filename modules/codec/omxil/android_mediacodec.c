@@ -676,6 +676,11 @@ static void DisplayBuffer(picture_sys_t* p_picsys, bool b_render)
     /* Release the MediaCodec buffer. */
     JNIEnv *env = NULL;
     vlcjni_setup_thread_env(&env);
+    if ((*env)->ExceptionOccurred(env)) {
+        msg_Err(p_dec, "Exception before MediaCodec.releaseOutputBuffer (DisplayBuffer)");
+        (*env)->ExceptionClear(env);
+    }
+
     (*env)->CallVoidMethod(env, p_sys->codec, p_sys->release_output_buffer, i_index, b_render);
     if ((*env)->ExceptionOccurred(env)) {
         msg_Err(p_dec, "Exception in MediaCodec.releaseOutputBuffer (DisplayBuffer)");
