@@ -903,7 +903,12 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
 
     vlcjni_setup_thread_env(&env);
 
-    if (p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED)) {
+    /* XXX: this is really a flush block from
+       DecoderBlockFlushNew() */
+    if ((p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED)) &&
+        (p_block->i_buffer == 128) &&
+        (p_block->i_dts == VLC_TS_INVALID) &&
+        (p_block->i_pts == VLC_TS_INVALID)) {
         block_Release(p_block);
         if (p_sys->decoded) {
             /* Invalidate all pictures that are currently in flight
