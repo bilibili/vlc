@@ -240,6 +240,8 @@ static stream_sys_t *sys_Alloc( void )
         p_sys->p_buffer[i] = (uint8_t *) malloc( RING_BLOCK_SIZE );
         if( p_sys->p_buffer[i] == NULL )
         {
+            for (int n = 0; n < i; n++)
+                free( p_sys->p_buffer[n] );
             sys_Free( &p_sys );
             return NULL;
         }
