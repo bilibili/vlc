@@ -366,6 +366,8 @@ static int PeekFromBuffer_l( stream_t *p_stream, void *p_buffer, int i_read )
     int i_to_read = i_data_ready;
     if( i_to_read > p_sys->i_buffer_size )
         i_to_read = p_sys->i_buffer_size;
+    if (i_to_read > i_read)
+        i_to_read = i_read;
 
     /* beyond last byte */
     int i_read_index  = p_sys->i_read_index;
