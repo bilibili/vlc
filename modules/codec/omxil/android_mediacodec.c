@@ -412,6 +412,7 @@ static int OpenDecoder(vlc_object_t *p_this)
     int num_codecs = (*env)->CallStaticIntMethod(env, p_sys->media_codec_list_class,
                                                  p_sys->get_codec_count);
     jobject codec_name = NULL;
+    jstring mime_string = (*env)->NewStringUTF(env, mime);
 
     for (int i = 0; i < num_codecs; i++) {
         jobject info = (*env)->CallStaticObjectMethod(env, p_sys->media_codec_list_class,
@@ -421,22 +422,44 @@ static int OpenDecoder(vlc_object_t *p_this)
             continue;
         }
 
-        jobject codec_capabilities = (*env)->CallObjectMethod(env, info, p_sys->get_capabilities_for_type,
-                                                              (*env)->NewStringUTF(env, mime));
-        if (codec_capabilities == NULL) {
-            if ((*env)->ExceptionOccurred(env)) {
-                msg_Warn(p_dec, "Exception occurred in MediaCodec.get_capabilities_for_type.");
-                (*env)->ExceptionClear(env);
-            }
+        jobject name = (*env)->CallObjectMethod(env, info, p_sys->get_name);
+        jsize name_len = (*env)->GetStringUTFLength(env, name);
+        const char *name_ptr = (*env)->GetStringUTFChars(env, name, NULL);
+        if (name_len == 0 || name_ptr == NULL) {
+            msg_Dbg(p_dec, "invalid codec name at %d", i);
+            (*env)->DeleteLocalRef(env, name);
             (*env)->DeleteLocalRef(env, info);
             continue;
+        } else if (0 == strncmp(name_ptr, "OMX.google.", 11)) {
+            msg_Dbg(p_dec, "ignore software codec named %.*s", name_len, name_ptr);
+            (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+            (*env)->DeleteLocalRef(env, name);
+            (*env)->DeleteLocalRef(env, info);
+            continue;
+        } else if (0 != strncmp(name_ptr, "OMX.", 4)) {
+            msg_Dbg(p_dec, "ignore unordinary codec named %.*s", name_len, name_ptr);
+            (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+            (*env)->DeleteLocalRef(env, name);
+            (*env)->DeleteLocalRef(env, info);
+            continue;
+        } else if (0 == strncmp(name_ptr, "OMX.MTK.VIDEO.DECODER.AVC", name_len)) {
+            msg_Dbg(p_dec, "disable %.*s", name_len, name_ptr);
+            (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+            (*env)->DeleteLocalRef(env, name);
+            (*env)->DeleteLocalRef(env, info);
+            continue;
+        } else if (!is_codec_at_least(name_ptr, false, MCODEC_UNKNOWN)) {
+            // slow or unsupport
+            msg_Dbg(p_dec, "disable %.*s due to slow or unsupport ", name_len, name_ptr);
+            (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+            (*env)->DeleteLocalRef(env, name);
+            (*env)->DeleteLocalRef(env, info);
+            continue;
+        } else {
+            msg_Dbg(p_dec, "using %.*s", name_len, name_ptr);
         }
 
-        int profile_levels_len = 0;
-        jobject profile_levels = (*env)->GetObjectField(env, codec_capabilities, p_sys->profile_levels_field);
-        if (profile_levels)
-            profile_levels_len = (*env)->GetArrayLength(env, profile_levels);
-        msg_Dbg(p_dec, "Number of profile levels: %d", profile_levels_len);
+        msg_Dbg(p_dec, "continue check codec named %.*s for %s", name_len, name_ptr, mime);
 
         jobject types = (*env)->CallObjectMethod(env, info, p_sys->get_supported_types);
         int num_types = (*env)->GetArrayLength(env, types);
@@ -444,6 +467,19 @@ static int OpenDecoder(vlc_object_t *p_this)
         for (int j = 0; j < num_types && !found; j++) {
             jobject type = (*env)->GetObjectArrayElement(env, types, j);
             if (!jstrcmp(env, type, mime)) {
+                jobject codec_capabilities = (*env)->CallObjectMethod(env, info, p_sys->get_capabilities_for_type,
+                                                                      mime_string);
+                if (codec_capabilities == NULL) {
+                    if ((*env)->ExceptionOccurred(env)) {
+                        msg_Warn(p_dec, "Exception occurred in MediaCodec.get_capabilities_for_type.");
+                        (*env)->ExceptionClear(env);
+                    }
+                    continue;
+                }
+                jobject profile_levels = (*env)->GetObjectField(env, codec_capabilities, p_sys->profile_levels_field);
+                int profile_levels_len = profile_levels ? (*env)->GetArrayLength(env, profile_levels) : 0;
+                msg_Dbg(p_dec, "Number of profile levels: %d", profile_levels_len);
+
                 /* The mime type is matching for this component. We
                    now check if the capabilities of the codec is
                    matching the video format. */
@@ -453,49 +489,45 @@ static int OpenDecoder(vlc_object_t *p_this)
 
                         int omx_profile = (*env)->GetLongField(env, profile_level, p_sys->profile_field);
                         size_t codec_profile = convert_omx_to_profile_idc(omx_profile);
-                        if (codec_profile != fmt_profile)
+                        if (codec_profile != fmt_profile) {
+                            (*env)->DeleteLocalRef(env, profile_level);
                             continue;
+                        }
                         /* Some encoders set the level too high, thus we ignore it for the moment.
                            We could try to guess the actual profile based on the resolution. */
                         found = true;
+                        (*env)->DeleteLocalRef(env, profile_level);
                     }
                 }
                 else
                     found = true;
+
+                (*env)->DeleteLocalRef(env, profile_levels);
+                (*env)->DeleteLocalRef(env, codec_capabilities);
             }
             (*env)->DeleteLocalRef(env, type);
         }
-        if (found) {
-            jobject name = (*env)->CallObjectMethod(env, info, p_sys->get_name);
-            jsize name_len = (*env)->GetStringUTFLength(env, name);
-            const char *name_ptr = (*env)->GetStringUTFChars(env, name, NULL);
-            if (name_len == 0 || name_ptr == NULL) {
-                msg_Dbg(p_dec, "invalid codec name %.*s", name_len, name_ptr);
-            } else if (0 == strncmp(name_ptr, "OMX.MTK.VIDEO.DECODER.AVC", name_len)) {
-                msg_Dbg(p_dec, "disable %.*s", name_len, name_ptr);
-                (*env)->ReleaseStringUTFChars(env, name, name_ptr);
-                (*env)->DeleteLocalRef(env, name);
-            } else if (!is_codec_at_least(name_ptr, false, MCODEC_UNKNOWN)) {
-                // slow or unsupport
-                msg_Dbg(p_dec, "disable %.*s due to slow or unsupport ", name_len, name_ptr);
-                (*env)->ReleaseStringUTFChars(env, name, name_ptr);
-                (*env)->DeleteLocalRef(env, name);
-            } else {
-                msg_Dbg(p_dec, "using %.*s", name_len, name_ptr);
-                p_sys->name = malloc(name_len + 1);
-                memcpy(p_sys->name, name_ptr, name_len);
-                p_sys->name[name_len] = '\0';
-                (*env)->ReleaseStringUTFChars(env, name, name_ptr);
-                codec_name = name;
-                break;
-            }
-        }
         (*env)->DeleteLocalRef(env, info);
+        if (found) {
+            msg_Dbg(p_dec, "using %.*s", name_len, name_ptr);
+            p_sys->name = malloc(name_len + 1);
+            memcpy(p_sys->name, name_ptr, name_len);
+            p_sys->name[name_len] = '\0';
+            (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+            codec_name = name;
+            break;
+        } else {
+            (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+            (*env)->DeleteLocalRef(env, name);
+        }
     }
+    (*env)->DeleteLocalRef(env, mime_string);
 
     if (!codec_name) {
         msg_Dbg(p_dec, "No suitable codec matching %s was found", mime);
         goto error;
+    } else {
+        msg_Dbg(p_dec, "found codec matching %s", mime);
     }
 
     // This method doesn't handle errors nicely, it crashes if the codec isn't found.
