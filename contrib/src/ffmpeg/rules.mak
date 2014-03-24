@@ -85,6 +85,11 @@ else
 FFMPEGCONF += --disable-encoders --disable-muxers
 endif
 
+# Support remuxing to certain formats
+FFMPEGCONF += --enable-protocol=file
+FFMPEGCONF += --enable-muxer=mp4
+FFMPEGCONF += --enable-bsf=aac_adtstoasc
+
 # Small size
 ifdef ENABLE_SMALL
 FFMPEGCONF += --enable-small
